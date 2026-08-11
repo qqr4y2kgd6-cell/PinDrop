@@ -1,0 +1,773 @@
+'use client';
+
+import { Map as MapLibreMap } from 'maplibre-gl';
+import { jsPDF, GState } from 'jspdf';
+import { PrintLayout, PrintPage, POI, MapViewport, IndexListConfig, TitleBlockConfig, Rect } from '@/types';
+import { createPrintStyle, addPoiLayer, repositionPoiLayer, computeGridRefs, clampBbox, applyLayerStyleOverrides, viewportActivePois, insetViewports } from './mapStyle';
+import { ensureMapWorker } from './maplibreWorker';
+import { titleFontPdf } from './titleFonts';
+import { resolveIndexConfig, buildIndexGroups, distributeGroups, scopePois } from './indexStyle';
+import { indexIconFor, drawIndexIcon } from './indexIcons';
+import { footprintDims, TITLE_BAR_MM } from './units';
+import { autoGridSpacing, spacingLabel, buildGridGeometry, buildBorder, bboxToFrameRect, buildBorderFrameSegments, buildGridRefLabels, buildInsetRect } from './grid';
+import { fetchViewportMap, buildVectorMapRenderData, drawVectorMapPdf, drawPoiBadgesPdf, renderMapThumbnail, hexToRgb, type VectorMapData } from './vectorMap';
+
+ensureMapWorker();
+
+const CSS_PX_PER_MM = 2;
+const EXPORT_DPI = 300;
+
+export interface ExportResult {
+  pdfDataUrl: string;
+  images: Record<string, string>;
+  pages: PrintPage[];
+}
+
+/** How the map frames are rendered in the exported PDF. */
+export type ExportRenderMode = 'vector' | 'raster';
+
+export function pageSizeMm(layout: PrintLayout) {
+  if (layout.pageSize === 'Custom') {
+    return [Math.max(50, layout.customPageSize?.width ?? 210), Math.max(50, layout.customPageSize?.height ?? 297)];
+  }
+  const sizes = {
+    A4: [210, 297],
+    A3: [297, 420],
+    A2: [420, 594],
+  } as const;
+  const [w, h] = sizes[layout.pageSize] ?? sizes.A4;
+  return layout.orientation === 'landscape' ? [h, w] : [w, h];
+}
+
+function mapAreaSize(vp: MapViewport, itemSpacing = 0) {
+  const title = vp.showTitle !== false ? TITLE_BAR_MM : 0;
+  const fp = footprintDims(vp.rotation, vp.positionOnPage.width, vp.positionOnPage.height);
+  const pad = itemSpacing / 2;
+  return { w: Math.max(1, fp.w - pad * 2), h: Math.max(1, fp.h - title - pad * 2) };
+}
+
+/** Applies a 90°-step rotation around (cx, cy) in mm for the duration of `draw`. */
+function withRotation(doc: jsPDF, angle: number | undefined, cx: number, cy: number, draw: () => void) {
+  if (!angle || angle % 360 === 0) {
+    draw();
+    return;
+  }
+  const s = doc.internal.scaleFactor;
+  const H = doc.internal.pageSize.getHeight();
+  const px = cx * s;
+  const py = (H - cy) * s;
+  const rad = (angle * Math.PI) / 180;
+  const c = Math.cos(rad);
+  const sn = Math.sin(rad);
+  doc.saveGraphicsState();
+  doc.setCurrentTransformationMatrix(doc.Matrix(c, sn, -sn, c, px - c * px + sn * py, py - sn * px - c * py));
+  draw();
+  doc.restoreGraphicsState();
+}
+
+function renderViewportImage(
+  vp: MapViewport,
+  pois: POI[],
+  colorMode: PrintLayout['colorMode'],
+  spotColor: string,
+  itemSpacing = 0
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const { w: mmW, h: mmH } = mapAreaSize(vp, itemSpacing);
+    const cssW = Math.max(2, Math.round(mmW * CSS_PX_PER_MM));
+    const cssH = Math.max(2, Math.round(mmH * CSS_PX_PER_MM));
+    const pixelRatio = EXPORT_DPI / (CSS_PX_PER_MM * 25.4);
+
+    const container = document.createElement('div');
+    container.style.cssText = `position:fixed;left:-10000px;top:0;width:${cssW}px;height:${cssH}px;`;
+    document.body.appendChild(container);
+
+    const map = new MapLibreMap({
+      container,
+      style: createPrintStyle(),
+      center: vp.center,
+      zoom: vp.zoom,
+      bearing: vp.rotation ?? 0,
+      attributionControl: false,
+      canvasContextAttributes: { preserveDrawingBuffer: true, antialias: true },
+      pixelRatio,
+    });
+
+    const timeout = window.setTimeout(() => {
+      // 'idle' is rAF-driven, so in a throttled/background tab it may never fire.
+      // If the style loaded, redraw() paints whatever tiles are ready synchronously
+      // so we can capture a partial map instead of waiting forever. If the style
+      // never loaded (e.g. throttled tab), the canvas is empty/black — reject so
+      // the caller falls back to the vector renderer instead of embedding a blank.
+      let url = '';
+      if (map.isStyleLoaded()) {
+        const canvas = container.querySelector('canvas');
+        if (canvas) {
+          try {
+            map.redraw();
+          } catch {
+            // ignore
+          }
+          // Capture before cleanup() — cleanup() removes the canvas from the DOM.
+          url = canvas.toDataURL('image/png');
+        }
+      }
+      cleanup();
+      if (url) {
+        resolve(url);
+      } else {
+        reject(new Error('map style not ready after timeout'));
+      }
+    }, 25000);
+
+    function cleanup() {
+      window.clearTimeout(timeout);
+      try {
+        map.remove();
+      } catch {
+        // ignore
+      }
+      container.remove();
+    }
+
+    const finish = () => {
+      window.setTimeout(() => {
+        const canvas = container.querySelector('canvas');
+        if (!canvas) {
+          cleanup();
+          reject(new Error('no canvas'));
+          return;
+        }
+        const url = canvas.toDataURL('image/png');
+        cleanup();
+        resolve(url);
+      }, 500);
+    };
+
+    map.on('error', (e) => {
+      // Tile errors are non-fatal; keep waiting for other tiles.
+      void e;
+    });
+
+    if (vp.bbox) {
+      map.on('load', () => {
+        const b = clampBbox(vp.bbox!);
+        map.fitBounds(
+          [
+            [b[0], b[1]],
+            [b[2], b[3]],
+          ],
+          { padding: 0, duration: 0, bearing: vp.rotation ?? 0 }
+        );
+      });
+    }
+
+    map.on('load', () => {
+      if (!map.isStyleLoaded()) return;
+      addPoiLayer(map, viewportActivePois(pois, vp), colorMode ?? 'spot', spotColor, vp.spiderify !== false);
+      repositionPoiLayer(map, viewportActivePois(pois, vp), vp.spiderify !== false);
+      applyLayerStyleOverrides(map, vp.layers);
+      map.once('idle', finish);
+    });
+  });
+}
+
+interface IndexColumn {
+  category: string;
+  items: POI[];
+  continued?: boolean;
+}
+
+function titleFontForPage(page: PrintLayout, override?: { family?: string; size?: number; weight?: PrintLayout['titleFontWeight'] }) {
+  const family = override?.family ?? page.titleFontFamily;
+  const size = override?.size ?? page.titleFontSize ?? 3;
+  const weight = override?.weight ?? page.titleFontWeight ?? 'bold';
+  const t = titleFontPdf(family);
+  return { family: t.family, style: weight === 'normal' ? ('normal' as const) : ('bold' as const), sizeMm: size };
+}
+
+const MM_TO_PT = 2.83465;
+
+function drawIndexPdf(doc: jsPDF, page: PrintLayout, pois: POI[], config: IndexListConfig) {
+  const pos = config.position;
+  const fp = footprintDims(config.rotation, pos.width, pos.height);
+  const cx = pos.x + fp.w / 2;
+  const cy = pos.y + fp.h / 2;
+  const pad = (page.itemSpacing ?? 0) / 2;
+  const insetPos = { ...pos, width: Math.max(1, pos.width - pad * 2), height: Math.max(1, pos.height - pad * 2) };
+  const shifted = { ...insetPos, x: cx - insetPos.width / 2, y: cy - insetPos.height / 2 };
+  withRotation(doc, config.rotation, cx, cy, () => {
+    drawIndexContentPdf(doc, page, pois, { ...config, position: shifted });
+  });
+}
+
+function drawIndexContentPdf(doc: jsPDF, page: PrintLayout, pois: POI[], config: IndexListConfig) {
+  const pos = config.position;
+  const resolved = resolveIndexConfig(config, page);
+  const scoped = scopePois(pois, resolved, page.viewports);
+  const groups = buildIndexGroups(scoped, resolved, page.viewports);
+  const columnsData = distributeGroups(groups, resolved.columns);
+  const columns: IndexColumn[][] = columnsData.map((col) => col.map((g) => ({ category: g.category, items: g.items, continued: g.continued })));
+
+  const [r, g, b] = hexToRgb(page.spotColor);
+  const refs = computeGridRefs(scoped, page.viewports);
+
+  // Legend body + category typography
+  const bodyFontFamily = titleFontPdf(resolved.bodyFontFamily).family;
+  const bodyFontStyle = resolved.bodyFontWeight === 'bold' ? 'bold' : 'normal';
+  const bodyFontSize = resolved.bodyFontSize * MM_TO_PT;
+  const [bodyCr, bodyCg, bodyCb] = hexToRgb(resolved.bodyTextColor);
+  const catFontFamily = titleFontPdf(resolved.categoryFontFamily).family;
+  const catFontStyle = resolved.categoryFontWeight === 'normal' ? 'normal' : 'bold';
+  const catFontSize = resolved.categoryFontSize * MM_TO_PT;
+  const [catCr, catCg, catCb] = hexToRgb(resolved.categoryColor);
+
+  const showTitle = resolved.showTitle;
+  const title = resolved.title;
+  const titleH = showTitle ? TITLE_BAR_MM : 0;
+  const borderColor = resolved.borderColor;
+  const radius = resolved.roundedCorners ? resolved.cornerRadius : 0;
+  const bgColor = resolved.backgroundColor;
+
+  // Spacing: inner padding + vertical pitch, both user-controlled
+  const pad = Math.max(0, resolved.padding);
+  const lineH = Math.max(1.2, resolved.lineHeight);
+
+  // Tile background + border
+  const [bgr, bgg, bgb] = hexToRgb(bgColor);
+  doc.setFillColor(bgr, bgg, bgb);
+  const [br, bg, bb] = hexToRgb(borderColor);
+  doc.setDrawColor(br, bg, bb);
+  doc.setLineWidth(resolved.borderWidth / 3);
+  doc.roundedRect(pos.x, pos.y, pos.width, pos.height, radius, radius, 'FD');
+
+  // Title bar
+  if (showTitle) {
+    const tbg = resolved.titleBackgroundColor;
+    const [tr, tg, tb] = hexToRgb(tbg);
+    doc.setFillColor(tr, tg, tb);
+    if (radius > 0) {
+      doc.roundedRect(pos.x, pos.y, pos.width, titleH, radius, radius, 'F');
+      doc.rect(pos.x, pos.y + titleH / 2, pos.width, titleH / 2, 'F');
+    } else {
+      doc.rect(pos.x, pos.y, pos.width, titleH, 'F');
+    }
+    const tf = titleFontForPage(page, {
+      family: resolved.titleFontFamily,
+      size: resolved.titleFontSize,
+      weight: resolved.titleFontWeight,
+    });
+    const [ttr, ttg, ttb] = hexToRgb(resolved.titleTextColor);
+    doc.setTextColor(ttr, ttg, ttb);
+    doc.setFont(tf.family, tf.style);
+    doc.setFontSize(tf.sizeMm * MM_TO_PT);
+    doc.text(title.toUpperCase(), pos.x + 2.5, pos.y + titleH - 1.8);
+  }
+
+  const bodyX = pos.x + pad;
+  const bodyW = pos.width - pad * 2;
+  const bodyTop = pos.y + titleH + pad * 0.7;
+  const bodyBottom = pos.y + pos.height - pad;
+
+  const colWidth = bodyW / Math.max(1, columns.length);
+
+  // Clip to the tile so long names / many rows can never spill out
+  doc.saveGraphicsState();
+  doc.rect(pos.x, bodyTop, pos.width, Math.max(0, bodyBottom - bodyTop), null);
+  doc.clip();
+  doc.discardPath();
+
+  columns.forEach((col, ci) => {
+    const x0 = bodyX + ci * colWidth;
+    const colRight = x0 + colWidth;
+    let y = bodyTop;
+
+    for (const group of col) {
+      if (group.category) {
+        const catText = group.category.toUpperCase() + (group.continued ? ' (cont.)' : '');
+        const iconSize = resolved.categoryFontSize * 1.5;
+        const iconGap = resolved.showIcons ? iconSize + 0.8 : 0;
+        if (resolved.showIcons) {
+          drawIndexIcon(doc, indexIconFor(group.category), x0, y - iconSize + resolved.categoryFontSize * 0.8, iconSize, [r, g, b]);
+        }
+        doc.setFont(catFontFamily, catFontStyle);
+        doc.setFontSize(catFontSize);
+        doc.setTextColor(catCr, catCg, catCb);
+        doc.text(catText, x0 + iconGap, y);
+        y += lineH * 0.35;
+        if (resolved.showCategoryUnderline) {
+          doc.setDrawColor(r, g, b);
+          doc.setLineWidth(0.2);
+          doc.line(x0, y, colRight, y);
+        }
+        y += lineH * 0.5;
+      }
+
+      for (const poi of group.items) {
+        const num = `${poi.customNumber}.`;
+        doc.setFont(bodyFontFamily, 'bold');
+        doc.setFontSize(bodyFontSize);
+        doc.setTextColor(r, g, b);
+        doc.text(num, x0, y);
+        const numW = doc.getTextWidth(num);
+
+        const ref = refs[poi.id];
+        let refW = 0;
+        if (ref) {
+          doc.setFont(bodyFontFamily, 'normal');
+          doc.setFontSize(bodyFontSize * 0.85);
+          refW = doc.getTextWidth(ref);
+        }
+
+        const gap = 1;
+        const nameX = x0 + numW + gap;
+        const nameMaxW = Math.max(3, colWidth - (numW + gap) - (ref ? refW + 2 : 0));
+
+        doc.setFont(bodyFontFamily, bodyFontStyle);
+        doc.setFontSize(bodyFontSize);
+        doc.setTextColor(bodyCr, bodyCg, bodyCb);
+        const nameLines = doc.splitTextToSize(poi.name, nameMaxW);
+        const firstLine = (nameLines[0] ?? poi.name) as string;
+        const firstLineW = doc.getTextWidth(firstLine);
+        doc.text(firstLine, nameX, y);
+
+        if (ref) {
+          const refX = colRight - refW;
+          doc.setFont(bodyFontFamily, 'normal');
+          doc.setFontSize(bodyFontSize * 0.85);
+          doc.setTextColor(120, 120, 120);
+          doc.text(ref, refX, y);
+          const dotStart = nameX + firstLineW + 0.8;
+          const dotEnd = refX - 1.2;
+          if (dotEnd > dotStart) {
+            doc.setDrawColor(180, 180, 180);
+            doc.setLineWidth(0.15);
+            doc.setLineDashPattern([0.4, 0.9], 0);
+            doc.line(dotStart, y - 0.3, dotEnd, y - 0.3);
+            doc.setLineDashPattern([], 0);
+          }
+        }
+
+        y += lineH;
+        for (let li = 1; li < nameLines.length; li++) {
+          doc.setFont(bodyFontFamily, bodyFontStyle);
+          doc.setFontSize(bodyFontSize);
+          doc.setTextColor(bodyCr, bodyCg, bodyCb);
+          doc.text(nameLines[li] as string, nameX, y);
+          y += lineH;
+        }
+      }
+      y += lineH * 0.4;
+    }
+  });
+
+  doc.restoreGraphicsState();
+}
+
+function drawTitleBlockPdf(doc: jsPDF, page: PrintLayout, config: TitleBlockConfig) {
+  const pos = config.position;
+  const fp = footprintDims(config.rotation, pos.width, pos.height);
+  const cx = pos.x + fp.w / 2;
+  const cy = pos.y + fp.h / 2;
+  const pad = (page.itemSpacing ?? 0) / 2;
+  const insetPos = { ...pos, width: Math.max(1, pos.width - pad * 2), height: Math.max(1, pos.height - pad * 2) };
+  const shifted = { ...insetPos, x: cx - insetPos.width / 2, y: cy - insetPos.height / 2 };
+  withRotation(doc, config.rotation, cx, cy, () => {
+    drawTitleBlockContentPdf(doc, page, config, shifted);
+  });
+}
+
+function drawTitleBlockContentPdf(doc: jsPDF, page: PrintLayout, config: TitleBlockConfig, posOverride?: Rect) {
+  const pos = posOverride ?? config.position;
+  const fontFamily = titleFontPdf(config.fontFamily ?? page.titleFontFamily ?? 'Helvetica').family;
+  const fontWeight = config.fontWeight ?? 'bold';
+  const style = fontWeight === 'normal' ? 'normal' : 'bold';
+  const fontSize = (config.fontSize ?? page.titleFontSize ?? 5) * MM_TO_PT;
+  const [tr, tg, tb] = hexToRgb(config.textColor ?? '#1a1a1a');
+  const [bgr, bgg, bgb] = hexToRgb(config.backgroundColor ?? '#ffffff');
+  const [br, bg, bb] = hexToRgb(config.borderColor ?? page.spotColor);
+
+  doc.setFillColor(bgr, bgg, bgb);
+  doc.setDrawColor(br, bg, bb);
+  doc.setLineWidth((config.borderWidth ?? 0) / 3);
+  doc.rect(pos.x, pos.y, pos.width, pos.height, 'FD');
+
+  const align = config.align ?? 'left';
+  const pad = 2.5;
+  const titleX =
+    align === 'left' ? pos.x + pad : align === 'right' ? pos.x + pos.width - pad : pos.x + pos.width / 2;
+  const textAlign: 'left' | 'center' | 'right' = align === 'left' ? 'left' : align === 'right' ? 'right' : 'center';
+
+  const title = config.title;
+  const subtitle = config.subtitle;
+
+  doc.setFont(fontFamily, style);
+  doc.setFontSize(fontSize);
+  doc.setTextColor(tr, tg, tb);
+  doc.text(title.toUpperCase(), titleX, pos.y + (pos.height - (subtitle ? fontSize * 0.55 : 0)) / 2 + fontSize * 0.72, { align: textAlign });
+
+  if (subtitle) {
+    const subSize = fontSize * 0.6;
+    doc.setFont(fontFamily, 'normal');
+    doc.setFontSize(subSize);
+    doc.text(subtitle.toUpperCase(), titleX, pos.y + (pos.height + (subtitle ? fontSize * 0.55 : 0)) / 2 + subSize * 0.3, { align: textAlign });
+  }
+}
+
+/** Vector grid lines + cartographic border (ticks & labels) drawn in PDF space. */
+function drawGridPdf(doc: jsPDF, vp: MapViewport, rect: { x: number; y: number; width: number; height: number }) {
+  if (!vp.bbox || !vp.showGrid) return;
+  const spacingM = vp.gridSpacing ?? autoGridSpacing(vp.bbox);
+  const proj = bboxToFrameRect(vp.bbox, rect);
+  const extent: [number, number, number, number] = [proj.lngMin, proj.latMin, proj.lngMax, proj.latMax];
+  const geo = buildGridGeometry(extent, spacingM);
+  const border = buildBorder(extent, spacingM);
+  const { x, y, width, height } = proj;
+
+  const lineW = vp.gridLineWidth ?? 0.15;
+  const opacity = Math.min(1, Math.max(0, vp.gridOpacity ?? 0.5));
+
+  // Grid lines
+  const [gr, gg, gb] = hexToRgb(vp.gridColor || '#8a8a8a');
+  doc.setDrawColor(gr, gg, gb);
+  doc.setLineWidth(lineW);
+  doc.setGState(new GState({ opacity }));
+  for (const lng of geo.lngLines) {
+    const lx = proj.lngToX(lng);
+    doc.line(lx, y, lx, y + height);
+  }
+  for (const lat of geo.latLines) {
+    const ly = proj.latToY(lat);
+    doc.line(x, ly, x + width, ly);
+  }
+  doc.setGState(new GState({ opacity: 1 }));
+
+  // Border ticks
+  const showBorder = vp.showBorder !== false;
+  const showRefs = vp.showGridRefs === true;
+  const [br, bg, bb] = hexToRgb(vp.borderColor || '#000000');
+  const borderW = vp.gridBorderWidth ?? 0.5;
+  doc.setDrawColor(br, bg, bb);
+  doc.setLineWidth(borderW);
+  if (showBorder) {
+    // Frame: solid rect, or alternating two-color segments
+    if (vp.borderAlternating) {
+      const alternateColor = vp.borderAlternateColor || '#ffffff';
+      const [ar, ag, ab] = hexToRgb(alternateColor);
+      buildBorderFrameSegments(geo, proj, borderW).forEach((s, i) => {
+        if (i % 2 === 0) doc.setFillColor(br, bg, bb);
+        else doc.setFillColor(ar, ag, ab);
+        doc.rect(s.x, s.y, s.width, s.height, 'F');
+      });
+      const cornerOutline = vp.borderAlternatingOutline !== false;
+      const [cr, cg, cb] = hexToRgb(vp.borderAlternatingCornerColor || vp.borderColor || '#000000');
+      doc.setFillColor(cr, cg, cb);
+      if (cornerOutline) {
+        doc.setDrawColor(br, bg, bb);
+        doc.setLineWidth(vp.borderAlternatingOutlineWidth ?? 0.2);
+      }
+      const cornerMode = cornerOutline ? 'FD' : 'F';
+      doc.rect(x, y, borderW, borderW, cornerMode);
+      doc.rect(x + width - borderW, y, borderW, borderW, cornerMode);
+      doc.rect(x, y + height - borderW, borderW, borderW, cornerMode);
+      doc.rect(x + width - borderW, y + height - borderW, borderW, borderW, cornerMode);
+      if (cornerOutline) {
+        doc.setDrawColor(br, bg, bb);
+        doc.setLineWidth(vp.borderAlternatingOutlineWidth ?? 0.2);
+        doc.rect(x, y, width, height);
+        doc.rect(x + borderW, y + borderW, width - 2 * borderW, height - 2 * borderW);
+      }
+      doc.setDrawColor(br, bg, bb);
+    } else {
+      doc.rect(x, y, width, height);
+    }
+
+    const tickLen = 1.6;
+    if (vp.showBorderTicks !== false) {
+      for (const t of border.ticks) {
+        if (t.edge === 'top') {
+          const tx = proj.lngToX(t.lng!);
+          doc.line(tx, y, tx, y + tickLen);
+        } else if (t.edge === 'bottom') {
+          const tx = proj.lngToX(t.lng!);
+          doc.line(tx, y + height, tx, y + height - tickLen);
+        } else if (t.edge === 'left') {
+          const ty = proj.latToY(t.lat!);
+          doc.line(x, ty, x + tickLen, ty);
+        } else {
+          const ty = proj.latToY(t.lat!);
+          doc.line(x + width, ty, x + width - tickLen, ty);
+        }
+      }
+    }
+
+    // Coordinate labels on major ticks (hidden when grid refs are shown)
+    if (vp.showBorderTicks !== false && !showRefs) {
+      const labelFamily = titleFontPdf('Helvetica').family;
+      doc.setFont(labelFamily, 'normal');
+      doc.setFontSize(5);
+      doc.setTextColor(60, 60, 60);
+      const pad = 1.1;
+      for (const t of border.ticks) {
+        if (!t.label) continue;
+        if (t.edge === 'top') {
+          doc.text(t.label, proj.lngToX(t.lng!), y - pad, { align: 'center' });
+        } else if (t.edge === 'bottom') {
+          doc.text(t.label, proj.lngToX(t.lng!), y + height + pad, { align: 'center' });
+        } else if (t.edge === 'left') {
+          doc.text(t.label, x - pad, proj.latToY(t.lat!), { align: 'right' });
+        } else {
+          doc.text(t.label, x + width + pad, proj.latToY(t.lat!), { align: 'left' });
+        }
+      }
+    }
+  }
+
+  // Grid reference letters / numbers just inside the map edge
+  if (showRefs) {
+    const refFamily = titleFontPdf(vp.gridRefFontFamily ?? 'Helvetica').family;
+    const refStyle = vp.gridRefFontWeight === 'bold' ? ('bold' as const) : ('normal' as const);
+    const refSizeMm = vp.gridRefFontSize ?? 2.8;
+    const [rr, rgr, rgb] = hexToRgb(vp.gridRefFontColor || '#3c3c3c');
+    doc.setFont(refFamily, refStyle);
+    doc.setFontSize(refSizeMm * MM_TO_PT);
+    doc.setTextColor(rr, rgr, rgb);
+    const pad = 1.2;
+    for (const l of buildGridRefLabels(geo, proj, pad)) {
+      if (l.edge === 'top') {
+        doc.text(l.text, l.x, l.y + refSizeMm, { align: 'center' });
+      } else if (l.edge === 'bottom') {
+        doc.text(l.text, l.x, l.y, { align: 'center' });
+      } else if (l.edge === 'left') {
+        doc.text(l.text, l.x, l.y, { align: 'left' });
+      } else {
+        doc.text(l.text, l.x, l.y, { align: 'right' });
+      }
+    }
+  }
+}
+
+function drawInsetsPdf(doc: jsPDF, page: PrintLayout, vp: MapViewport, area: { x: number; y: number; width: number; height: number }) {
+  if (!vp.bbox) return;
+  const proj = bboxToFrameRect(vp.bbox, area);
+  const [ir, ig, ib] = hexToRgb(vp.insetColor || '#e0563d');
+  const labelFamily = titleFontPdf('Helvetica').family;
+  for (const child of insetViewports(page.viewports, vp)) {
+    const rect = buildInsetRect(proj, child.bbox!, child.title);
+    if (!rect) continue;
+    doc.setDrawColor(ir, ig, ib);
+    doc.setLineWidth(vp.insetLineWidth ?? 0.3);
+    doc.setLineDashPattern([1.6, 1], 0);
+    doc.rect(rect.x, rect.y, rect.width, rect.height);
+    doc.setLineDashPattern([], 0);
+    if (vp.showInsetLabels !== false) {
+      doc.setFont(labelFamily, 'bold');
+      doc.setFontSize(4);
+      doc.setTextColor(ir, ig, ib);
+      doc.text(child.title, rect.x + 0.8, Math.max(rect.y - 0.8, area.y + 1.6));
+    }
+  }
+}
+
+function drawViewportPdf(doc: jsPDF, page: PrintLayout, vp: MapViewport, pois: POI[], img?: string, vector?: VectorMapData) {
+  const p = vp.positionOnPage;
+  const fp = footprintDims(vp.rotation, p.width, p.height);
+  // itemSpacing is symmetric padding: inset the whole frame so the fold lines
+  // fall in the blank gutter between neighbouring maps.
+  const pad = (page.itemSpacing ?? 0) / 2;
+  const bx = p.x + pad;
+  const by = p.y + pad;
+  const bw = Math.max(1, fp.w - pad * 2);
+  const bh = Math.max(1, fp.h - pad * 2);
+  const title = vp.showTitle !== false;
+  const titleH = title ? TITLE_BAR_MM : 0;
+  const radius = vp.roundedCorners ? (vp.cornerRadius ?? 4) : 0;
+
+  // Map background
+  const [fbr, fbg, fbb] = hexToRgb(vp.backgroundColor || '#ffffff');
+  doc.setFillColor(fbr, fbg, fbb);
+  doc.roundedRect(bx, by, bw, bh, radius, radius, 'F');
+
+  // Title bar (stays horizontal; the map content rotates beneath it via bearing)
+  if (title) {
+    const withBg = vp.titleBackground !== false;
+    const tbg = withBg ? (vp.titleBackgroundColor || page.defaultTitleBackgroundColor || page.spotColor) : '#fafafa';
+    const [tr, tg, tb] = hexToRgb(tbg);
+    doc.setFillColor(tr, tg, tb);
+    if (radius > 0) {
+      doc.roundedRect(bx, by, bw, titleH, radius, radius, 'F');
+      doc.rect(bx, by + titleH / 2, bw, titleH / 2, 'F');
+    } else {
+      doc.rect(bx, by, bw, titleH, 'F');
+    }
+    if (!withBg) {
+      doc.setDrawColor(26, 26, 26);
+      doc.setLineWidth(0.2);
+      doc.line(bx, by + titleH, bx + bw, by + titleH);
+    }
+    const titleTextColor = vp.titleTextColor || page.defaultTitleTextColor || (withBg ? '#ffffff' : '#1a1a1a');
+    const [ttr, ttg, ttb] = hexToRgb(titleTextColor);
+    doc.setTextColor(ttr, ttg, ttb);
+    const tf = titleFontForPage(page, {
+      family: vp.titleFontFamily,
+      size: vp.titleFontSize,
+      weight: vp.titleFontWeight,
+    });
+    doc.setFont(tf.family, tf.style);
+    doc.setFontSize(tf.sizeMm * MM_TO_PT);
+    doc.text(vp.title.toUpperCase(), bx + 2.5, by + titleH - 1.8);
+    // Real-world grid size indicator (right-aligned), matching the editor title bar.
+    if (vp.showGrid && vp.showGridIndicator !== false && vp.bbox) {
+      const spacing = vp.gridSpacing ?? autoGridSpacing(vp.bbox);
+      const indicator = `Grid = ${spacingLabel(spacing)} × ${spacingLabel(spacing)}`;
+      doc.setFontSize(Math.max(1.2, tf.sizeMm * 0.6) * MM_TO_PT);
+      doc.text(indicator, bx + bw - 2.5, by + titleH - 1.8, { align: 'right' });
+    }
+  }
+
+  // Map content: vector tiles (preferred) or the 300-DPI raster fallback.
+  // The vector map is drawn rotated like the raster was, over a region covering
+  // the whole frame (so rotated corners stay filled), clipped to the frame.
+  if (vector && vector.tiles.length > 0) {
+    const area = { x: bx, y: by + titleH, width: bw, height: bh - titleH };
+    const rad = ((vp.rotation ?? 0) * Math.PI) / 180;
+    const c = Math.abs(Math.cos(rad));
+    const s = Math.abs(Math.sin(rad));
+    const hw = (area.width * c + area.height * s) / 2;
+    const hh = (area.width * s + area.height * c) / 2;
+    const cx = area.x + area.width / 2;
+    const cy = area.y + area.height / 2;
+    const proj = bboxToFrameRect(vector.extent, { x: cx - hw, y: cy - hh, width: hw * 2, height: hh * 2 });
+    const render = buildVectorMapRenderData(vector, proj, vp.layers);
+    const badges = viewportActivePois(pois, vp).filter(
+      (p) => p.lng >= vector.extent[0] && p.lng <= vector.extent[2] && p.lat >= vector.extent[1] && p.lat <= vector.extent[3]
+    );
+    doc.saveGraphicsState();
+    doc.rect(area.x, area.y, area.width, area.height, null);
+    doc.clip();
+    doc.discardPath();
+    withRotation(doc, vp.rotation, cx, cy, () => {
+      drawVectorMapPdf(doc, render, proj);
+      drawPoiBadgesPdf(doc, proj, badges, page.colorMode, page.spotColor, vp.spiderify !== false);
+    });
+    doc.restoreGraphicsState();
+  } else if (img) {
+    doc.addImage(img, 'PNG', bx, by + titleH, bw, bh - titleH);
+  }
+
+  // Vector grid + cartographic border, rotated to overlay the bearing-rotated raster
+  if (vp.bbox && (vp.showGrid || vp.showInsets)) {
+    const area = { x: bx, y: by + titleH, width: bw, height: bh - titleH };
+    withRotation(doc, vp.rotation, area.x + area.width / 2, area.y + area.height / 2, () => {
+      if (vp.showGrid) drawGridPdf(doc, vp, area);
+      drawInsetsPdf(doc, page, vp, area);
+    });
+  }
+
+  // Frame border
+  const [br, bg, bb] = hexToRgb(vp.borderColor || '#000000');
+  doc.setDrawColor(br, bg, bb);
+  doc.setLineWidth((vp.borderWidth ?? 1) / 3);
+  doc.roundedRect(bx, by, bw, bh, radius, radius, 'S');
+}
+
+function drawPage(doc: jsPDF, page: PrintLayout, pois: POI[], images: Record<string, string>, vectors: Record<string, VectorMapData>) {
+  const [pw, ph] = pageSizeMm(page);
+
+  const [paperR, paperG, paperB] = hexToRgb(page.paperColor || '#ffffff');
+  doc.setFillColor(paperR, paperG, paperB);
+  doc.rect(0, 0, pw, ph, 'F');
+
+  // Crop marks
+  doc.setDrawColor(120, 120, 120);
+  doc.setLineWidth(0.2);
+  const mark = 4;
+  doc.line(0, 0, mark, 0); doc.line(0, 0, 0, mark);
+  doc.line(pw, 0, pw - mark, 0); doc.line(pw, 0, pw, mark);
+  doc.line(0, ph, mark, ph); doc.line(0, ph, 0, ph - mark);
+  doc.line(pw, ph, pw - mark, ph); doc.line(pw, ph, pw, ph - mark);
+
+  // Draw each map frame
+  for (const vp of page.viewports) {
+    drawViewportPdf(doc, page, vp, pois, images[`${page.id}:${vp.id}`], vectors[`${page.id}:${vp.id}`]);
+  }
+
+  for (const config of page.indexLists) {
+    drawIndexPdf(doc, page, pois, config);
+  }
+
+  for (const config of page.titleBlocks) {
+    drawTitleBlockPdf(doc, page, config);
+  }
+}
+
+export async function exportLayout(pages: PrintPage[], pois: POI[], exportMode: ExportRenderMode = 'vector'): Promise<ExportResult> {
+  const images: Record<string, string> = {};
+  const vectors: Record<string, VectorMapData> = {};
+
+  const tasks: Array<{ page: PrintPage; vp: MapViewport }> = [];
+  for (const page of pages) {
+    for (const vp of page.viewports) {
+      tasks.push({ page, vp });
+    }
+  }
+
+  const colorModes = new Map(pages.map((p) => [p.id, p.colorMode ?? 'spot']));
+  const spotColors = new Map(pages.map((p) => [p.id, p.spotColor]));
+
+  await Promise.all(
+    tasks.map(async ({ page, vp }) => {
+      const key = `${page.id}:${vp.id}`;
+      const colorMode = colorModes.get(page.id);
+      const spotColor = spotColors.get(page.id) ?? '#e0563d';
+      const itemSpacing = page.itemSpacing ?? 0;
+      const areaMm = mapAreaSize(vp, itemSpacing);
+      if (exportMode === 'raster') {
+        try {
+          images[key] = await renderViewportImage(vp, pois, colorMode, spotColor, itemSpacing);
+        } catch (e) {
+          console.warn(`Raster export failed for "${vp.title}", falling back to vector.`, e);
+          try {
+            const data = await fetchViewportMap(vp, areaMm);
+            vectors[key] = data;
+            const thumbPois = viewportActivePois(pois, vp).filter(
+              (p) => p.lng >= data.extent[0] && p.lng <= data.extent[2] && p.lat >= data.extent[1] && p.lat <= data.extent[3]
+            );
+            images[key] = renderMapThumbnail(data, areaMm, thumbPois, vp.layers, colorMode, spotColor, vp.spiderify !== false);
+          } catch (e2) {
+            console.warn(`Vector fallback failed for "${vp.title}".`, e2);
+            throw e2;
+          }
+        }
+        return;
+      }
+      try {
+        const data = await fetchViewportMap(vp, areaMm);
+        vectors[key] = data;
+        const thumbPois = viewportActivePois(pois, vp).filter(
+          (p) => p.lng >= data.extent[0] && p.lng <= data.extent[2] && p.lat >= data.extent[1] && p.lat <= data.extent[3]
+        );
+        images[key] = renderMapThumbnail(data, areaMm, thumbPois, vp.layers, colorMode, spotColor, vp.spiderify !== false);
+      } catch (e) {
+        console.warn(`Vector export failed for "${vp.title}", falling back to raster.`, e);
+        images[key] = await renderViewportImage(vp, pois, colorMode, spotColor, itemSpacing);
+      }
+    })
+  );
+
+  const first = pages[0];
+  const [pw, ph] = pageSizeMm(first);
+  const doc = new jsPDF({ orientation: pw >= ph ? 'landscape' : 'portrait', unit: 'mm', format: [pw, ph] });
+
+  pages.forEach((page, i) => {
+    if (i > 0) {
+      const [w, h] = pageSizeMm(page);
+      const orient = w >= h ? 'landscape' : 'portrait';
+      doc.addPage([w, h], orient);
+    }
+    drawPage(doc, page, pois, images, vectors);
+  });
+
+  const pdfDataUrl = doc.output('datauristring');
+  return { pdfDataUrl, images, pages };
+}
