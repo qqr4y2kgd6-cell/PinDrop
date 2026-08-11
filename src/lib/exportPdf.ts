@@ -271,9 +271,15 @@ function drawIndexContentPdf(doc: jsPDF, page: PrintLayout, pois: POI[], config:
 
   const colWidth = bodyW / Math.max(1, columns.length);
 
-  // Clip to the tile so long names / many rows can never spill out
+  // Clip to the tile so long names / many rows can never spill out. When the
+  // tile has rounded corners, clip to the rounded-rect path (the bottom corners
+  // would otherwise let body content poke out past the curve).
   doc.saveGraphicsState();
-  doc.rect(pos.x, bodyTop, pos.width, Math.max(0, bodyBottom - bodyTop), null);
+  if (radius > 0) {
+    doc.roundedRect(pos.x, pos.y, pos.width, pos.height, radius, radius, null);
+  } else {
+    doc.rect(pos.x, bodyTop, pos.width, Math.max(0, bodyBottom - bodyTop), null);
+  }
   doc.clip();
   doc.discardPath();
 

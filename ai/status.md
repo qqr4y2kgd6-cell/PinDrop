@@ -130,6 +130,8 @@
 - ✅ POI import (GeoJSON/CSV) + paste, filters, renumber, add/edit dialogs
 - ✅ PDF export (300 DPI, exact mm, multi-page) with fully vector maps (OpenFreeMap tiles drawn directly as PDF paths) + vector grid/index/title + preview modal
 - ✅ Map frames clipped correctly (`re W n` clip sequences verified in the PDF content stream); vector maps verified north-up with correct land/sea by geographic spot-checks
+- ✅ Rotated (90/180/270°) map frames, index tiles and title blocks render correctly in the layout view, the export preview and the PDF (footprint-based sizing + `shrink-0` on tile frames; single rotation `cm` transform verified in the PDF stream)
+- ✅ Rounded index-tile corners clip the body content in the PDF: the full-tile rounded-rect path (`c` corner arcs + `h` close) + `W n` clip wraps all body content (icons, categories, rows, dotted leaders) before the matching `Q` restore — verified in the PDF content stream
 - ✅ POI badges limited to each viewport's extent (Tokyo/Kyoto detail maps draw only their own POIs)
 - ✅ Spiderification of overlapping POI badges (ring spread + leader lines, guaranteed min badge gap via ring clearance + rigid-cluster separation) in the PDF, the preview thumbnails and the MapLibre editor; per-viewport toggle; verified in the PDF content stream (gray `0.4 G` legs at 0.2 mm + ring positions) and via unit tests (0 bad pairs across dense/mixed cluster scenarios)
 - ✅ Raster render mode toggle: force the MapLibre 300-DPI image pass (3 embedded Image XObjects verified in a visible tab) instead of the vector renderer; background-tab raster exports fall back to vector instead of producing blank maps
@@ -140,3 +142,4 @@
 - Vector map export still fetches tiles from the OpenFreeMap network at export time (needs connectivity); per-viewport raster fallback covers fetch/decode failures, but a fully offline export is not implemented.
 - The vector renderer is a simplified basemap (no terrain, hillshading, symbol labels or pattern fills).
 - No print-scale indicator / exact DPI readout in the export dialog yet (mm preview exists; the frame title-bar grid indicator covers map scale).
+- Rotating a tile that is wider (unrotated) than the page is tall (e.g. a 285 mm-wide index band rotated 90° on A4 landscape, 210 mm tall) produces a portrait tile taller than the page; it is faithfully rendered (centered on the rotated footprint center) and therefore overflows the bottom edge in both the layout editor and the PDF export. Kept as-is by decision — no clamping/scaling.

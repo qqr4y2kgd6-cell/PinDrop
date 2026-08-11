@@ -263,37 +263,55 @@ export function ExportDialog({ open, onOpenChange, pages, pois, autoDownload }: 
                       {page.indexLists.map((config) => {
                         const resolved = resolveIndexConfig(config, page);
                         const p = config.position;
+                        const rotation = config.rotation ?? 0;
+                        const fp = footprintDims(rotation, p.width, p.height);
+                        const pad = (page.itemSpacing ?? 0) / 2;
+                        const contentW = Math.max(1, p.width - pad * 2);
+                        const contentH = Math.max(1, p.height - pad * 2);
+                        const rotTransform =
+                          rotation === 0 ? undefined : `rotate(${rotation === 270 ? -90 : rotation}deg)`;
                         return (
                           <div
                             key={`${page.id}:${config.id}`}
-                            className="absolute overflow-hidden flex flex-col"
+                            className="absolute"
                             style={{
                               left: p.x * PX_PER_MM,
                               top: p.y * PX_PER_MM,
-                              width: p.width * PX_PER_MM,
-                              height: p.height * PX_PER_MM,
-                              border: `${resolved.borderWidth * PX_PER_MM}px solid ${resolved.borderColor}`,
-                              borderRadius: resolved.roundedCorners ? resolved.cornerRadius * PX_PER_MM : 0,
-                              backgroundColor: resolved.backgroundColor,
+                              width: fp.w * PX_PER_MM,
+                              height: fp.h * PX_PER_MM,
                             }}
                           >
-                            {resolved.showTitle && (
+                            <div className="absolute inset-0 flex items-center justify-center">
                               <div
-                                className="flex items-center px-2 uppercase tracking-widest shrink-0"
+                                className="relative overflow-hidden flex flex-col shrink-0"
                                 style={{
-                                  height: titleHmm * PX_PER_MM,
-                                  backgroundColor: resolved.titleBackgroundColor,
-                                  color: resolved.titleTextColor,
-                                  fontFamily: titleFontCss(resolved.titleFontFamily),
-                                  fontSize: Math.max(8, resolved.titleFontSize * PX_PER_MM),
-                                  fontWeight: resolved.titleFontWeight,
+                                  width: contentW * PX_PER_MM,
+                                  height: contentH * PX_PER_MM,
+                                  transform: rotTransform,
+                                  border: `${resolved.borderWidth * PX_PER_MM}px solid ${resolved.borderColor}`,
+                                  borderRadius: resolved.roundedCorners ? resolved.cornerRadius * PX_PER_MM : 0,
+                                  backgroundColor: resolved.backgroundColor,
                                 }}
                               >
-                                <span className="truncate">{resolved.title}</span>
+                                {resolved.showTitle && (
+                                  <div
+                                    className="flex items-center px-2 uppercase tracking-widest shrink-0"
+                                    style={{
+                                      height: titleHmm * PX_PER_MM,
+                                      backgroundColor: resolved.titleBackgroundColor,
+                                      color: resolved.titleTextColor,
+                                      fontFamily: titleFontCss(resolved.titleFontFamily),
+                                      fontSize: Math.max(8, resolved.titleFontSize * PX_PER_MM),
+                                      fontWeight: resolved.titleFontWeight,
+                                    }}
+                                  >
+                                    <span className="truncate">{resolved.title}</span>
+                                  </div>
+                                )}
+                                <div className="flex-1 min-h-0 overflow-hidden">
+                                  <IndexListBody layout={page} config={config} pois={pois} compact />
+                                </div>
                               </div>
-                            )}
-                            <div className="flex-1 min-h-0 overflow-hidden">
-                              <IndexListBody layout={page} config={config} pois={pois} compact />
                             </div>
                           </div>
                         );

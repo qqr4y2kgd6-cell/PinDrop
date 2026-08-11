@@ -55,7 +55,7 @@ export function IndexListFrameWrapper({ layout, config, contentPx, isActive, onS
       onClick={onSelect}
     >
       <div
-        className={cn('relative border flex flex-col group', !showTitle && 'frame-drag-handle cursor-grab', isActive && 'ring-2 ring-blue-500')}
+        className={cn('relative border flex flex-col group shrink-0', !showTitle && 'frame-drag-handle cursor-grab', isActive && 'ring-2 ring-blue-500')}
         style={{ ...frameStyle, transform: rotTransform }}
       >
         <div className="absolute top-1 right-1 flex gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">

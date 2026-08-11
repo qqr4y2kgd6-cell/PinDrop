@@ -45,7 +45,7 @@ export function TitleBlockFrame({ layout, config, contentPx, isActive, onSelect,
   return (
     <div className="absolute inset-0 flex items-center justify-center" onClick={onSelect}>
       <div
-        className={cn('frame-drag-handle relative border flex flex-col group cursor-grab', isActive && 'ring-2 ring-blue-500')}
+        className={cn('frame-drag-handle relative border flex flex-col group cursor-grab shrink-0', isActive && 'ring-2 ring-blue-500')}
         style={{ ...frameStyle, transform: rotTransform }}
       >
         <div className="absolute top-1 right-1 flex gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
