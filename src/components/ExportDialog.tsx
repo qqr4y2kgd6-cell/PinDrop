@@ -26,27 +26,36 @@ const PX_PER_MM = 2;
 
 type PreviewZoom = 'fit' | 0.5 | 1;
 
+/** Decode a `data:` URL into a Blob without fetch (Safari rejects fetch on large data: URLs). */
+function dataUrlToBlob(dataUrl: string): Blob {
+  const comma = dataUrl.indexOf(',');
+  const meta = comma >= 0 ? dataUrl.slice(0, comma) : '';
+  const b64 = comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl;
+  const mime = /data:([^;]+)/.exec(meta)?.[1] ?? 'application/octet-stream';
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new Blob([bytes], { type: mime });
+}
+
 /**
  * Safari doesn't reliably download large `data:` URLs from a programmatically
  * clicked anchor, so convert to a Blob URL first. Appending the anchor to the
  * document is also required for Safari to honor the click.
  */
 function triggerDownload(dataUrl: string, fileName: string) {
-  void (async () => {
-    try {
-      const blob = await (await fetch(dataUrl)).blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.setTimeout(() => URL.revokeObjectURL(url), 10000);
-    } catch (e) {
-      console.error('Download failed', e);
-    }
-  })();
+  try {
+    const url = URL.createObjectURL(dataUrlToBlob(dataUrl));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 10000);
+  } catch (e) {
+    console.error('Download failed', e);
+  }
 }
 
 export function ExportDialog({ open, onOpenChange, pages, pois, autoDownload }: ExportDialogProps) {
