@@ -46,7 +46,55 @@ function mapAreaSize(vp: MapViewport, itemSpacing = 0) {
   return { w: Math.max(1, fp.w - pad * 2), h: Math.max(1, fp.h - title - pad * 2) };
 }
 
-/** Applies a 90°-step rotation around (cx, cy) in mm for the duration of `draw`. */
+/**
+ * Path data for a rect whose two bottom corners are rounded by `r` (top corners
+ * stay square). Consumed by jsPDF's `doc.path()`, then clipped with `clip()`.
+ */
+function roundedBottomPath(x: number, y: number, w: number, h: number, r: number) {
+  const rr = Math.min(Math.max(0, r), w / 2, h);
+  if (rr <= 0) {
+    return [
+      { op: 'm', c: [x, y] },
+      { op: 'l', c: [x + w, y] },
+      { op: 'l', c: [x + w, y + h] },
+      { op: 'l', c: [x, y + h] },
+      { op: 'h', c: [] },
+    ];
+  }
+  const k = 0.5523 * rr;
+  return [
+    { op: 'm', c: [x, y] },
+    { op: 'l', c: [x + w, y] },
+    { op: 'l', c: [x + w, y + h - rr] },
+    { op: 'c', c: [x + w, y + h - rr + k, x + w - rr + k, y + h, x + w - rr, y + h] },
+    { op: 'l', c: [x + rr, y + h] },
+    { op: 'c', c: [x + rr - k, y + h, x, y + h - rr + k, x, y + h - rr] },
+    { op: 'l', c: [x, y] },
+    { op: 'h', c: [] },
+  ];
+}
+
+/** Clips the current graphics state to the map body area, rounding the bottom corners when `radius > 0`. */
+function clipToMapBody(doc: jsPDF, x: number, y: number, w: number, h: number, radius: number) {
+  doc.saveGraphicsState();
+  if (radius > 0) {
+    doc.path(roundedBottomPath(x, y, w, h, radius));
+  } else {
+    doc.rect(x, y, w, h, null);
+  }
+  doc.clip();
+  doc.discardPath();
+}
+
+/**
+ * Applies a 90°-step rotation around (cx, cy) in mm for the duration of `draw`.
+ *
+ * Positive angles rotate clockwise on screen (matching CSS `rotate()` and the
+ * layout/preview). The transform is built in PDF y-up space: jsPDF flips API
+ * y-down coordinates when writing them, so the clockwise rotation about a point
+ * maps to the matrix [c, -sinθ, sinθ, c] with translation
+ * e = px - c·px - sinθ·py, f = py + sinθ·px - c·py.
+ */
 function withRotation(doc: jsPDF, angle: number | undefined, cx: number, cy: number, draw: () => void) {
   if (!angle || angle % 360 === 0) {
     draw();
@@ -60,7 +108,7 @@ function withRotation(doc: jsPDF, angle: number | undefined, cx: number, cy: num
   const c = Math.cos(rad);
   const sn = Math.sin(rad);
   doc.saveGraphicsState();
-  doc.setCurrentTransformationMatrix(doc.Matrix(c, sn, -sn, c, px - c * px + sn * py, py - sn * px - c * py));
+  doc.setCurrentTransformationMatrix(doc.Matrix(c, -sn, sn, c, px - c * px - sn * py, py + sn * px - c * py));
   draw();
   doc.restoreGraphicsState();
 }
@@ -388,7 +436,6 @@ function drawTitleBlockContentPdf(doc: jsPDF, page: PrintLayout, config: TitleBl
   const fontFamily = titleFontPdf(config.fontFamily ?? page.titleFontFamily ?? 'Helvetica').family;
   const fontWeight = config.fontWeight ?? 'bold';
   const style = fontWeight === 'normal' ? 'normal' : 'bold';
-  const fontSize = (config.fontSize ?? page.titleFontSize ?? 5) * MM_TO_PT;
   const [tr, tg, tb] = hexToRgb(config.textColor ?? '#1a1a1a');
   const [bgr, bgg, bgb] = hexToRgb(config.backgroundColor ?? '#ffffff');
   const [br, bg, bb] = hexToRgb(config.borderColor ?? page.spotColor);
@@ -407,16 +454,23 @@ function drawTitleBlockContentPdf(doc: jsPDF, page: PrintLayout, config: TitleBl
   const title = config.title;
   const subtitle = config.subtitle;
 
+  const fsMm = config.fontSize ?? page.titleFontSize ?? 5;
+  const titleSizePt = fsMm * MM_TO_PT;
+  const subSizePt = fsMm * 0.6 * MM_TO_PT;
+  const titleLH = fsMm * 1.2;
+  const subLH = fsMm * 0.6 * 1.2;
+  const groupH = titleLH + (subtitle ? subLH : 0);
+  const groupTop = pos.y + Math.max(0, (pos.height - groupH) / 2);
+
   doc.setFont(fontFamily, style);
-  doc.setFontSize(fontSize);
+  doc.setFontSize(titleSizePt);
   doc.setTextColor(tr, tg, tb);
-  doc.text(title.toUpperCase(), titleX, pos.y + (pos.height - (subtitle ? fontSize * 0.55 : 0)) / 2 + fontSize * 0.72, { align: textAlign });
+  doc.text(title.toUpperCase(), titleX, groupTop + titleLH * 0.78, { align: textAlign });
 
   if (subtitle) {
-    const subSize = fontSize * 0.6;
     doc.setFont(fontFamily, 'normal');
-    doc.setFontSize(subSize);
-    doc.text(subtitle.toUpperCase(), titleX, pos.y + (pos.height + (subtitle ? fontSize * 0.55 : 0)) / 2 + subSize * 0.3, { align: textAlign });
+    doc.setFontSize(subSizePt);
+    doc.text(subtitle, titleX, groupTop + titleLH + subLH * 0.78, { align: textAlign });
   }
 }
 
@@ -648,26 +702,27 @@ function drawViewportPdf(doc: jsPDF, page: PrintLayout, vp: MapViewport, pois: P
     const badges = viewportActivePois(pois, vp).filter(
       (p) => p.lng >= vector.extent[0] && p.lng <= vector.extent[2] && p.lat >= vector.extent[1] && p.lat <= vector.extent[3]
     );
-    doc.saveGraphicsState();
-    doc.rect(area.x, area.y, area.width, area.height, null);
-    doc.clip();
-    doc.discardPath();
+    clipToMapBody(doc, area.x, area.y, area.width, area.height, radius);
     withRotation(doc, vp.rotation, cx, cy, () => {
       drawVectorMapPdf(doc, render, proj);
       drawPoiBadgesPdf(doc, proj, badges, page.colorMode, page.spotColor, vp.spiderify !== false);
     });
     doc.restoreGraphicsState();
   } else if (img) {
+    clipToMapBody(doc, bx, by + titleH, bw, bh - titleH, radius);
     doc.addImage(img, 'PNG', bx, by + titleH, bw, bh - titleH);
+    doc.restoreGraphicsState();
   }
 
   // Vector grid + cartographic border, rotated to overlay the bearing-rotated raster
   if (vp.bbox && (vp.showGrid || vp.showInsets)) {
     const area = { x: bx, y: by + titleH, width: bw, height: bh - titleH };
+    clipToMapBody(doc, area.x, area.y, area.width, area.height, radius);
     withRotation(doc, vp.rotation, area.x + area.width / 2, area.y + area.height / 2, () => {
       if (vp.showGrid) drawGridPdf(doc, vp, area);
       drawInsetsPdf(doc, page, vp, area);
     });
+    doc.restoreGraphicsState();
   }
 
   // Frame border
