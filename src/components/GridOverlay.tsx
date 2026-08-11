@@ -46,8 +46,13 @@ export function GridOverlay({
     const el = svgRef.current;
     if (!el) return;
     const update = () => {
-      const r = el.getBoundingClientRect();
-      if (r.width > 0 && r.height > 0) setSize({ w: r.width, h: r.height });
+      // Use the layout box, not getBoundingClientRect: the ExportDialog preview
+      // wraps the page in transform: scale(...), which shrinks the visual rect
+      // and would squeeze the grid into the upper-left corner. clientWidth/Height
+      // report the untransformed layout size, so the overlay matches the map.
+      const w = el.clientWidth;
+      const h = el.clientHeight;
+      if (w > 0 && h > 0) setSize({ w, h });
     };
     update();
     const ro = new ResizeObserver(update);

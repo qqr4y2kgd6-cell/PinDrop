@@ -26,6 +26,29 @@ const PX_PER_MM = 2;
 
 type PreviewZoom = 'fit' | 0.5 | 1;
 
+/**
+ * Safari doesn't reliably download large `data:` URLs from a programmatically
+ * clicked anchor, so convert to a Blob URL first. Appending the anchor to the
+ * document is also required for Safari to honor the click.
+ */
+function triggerDownload(dataUrl: string, fileName: string) {
+  void (async () => {
+    try {
+      const blob = await (await fetch(dataUrl)).blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 10000);
+    } catch (e) {
+      console.error('Download failed', e);
+    }
+  })();
+}
+
 export function ExportDialog({ open, onOpenChange, pages, pois, autoDownload }: ExportDialogProps) {
   const [pdfDataUrl, setPdfDataUrl] = useState<string | null>(null);
   const [images, setImages] = useState<Record<string, string>>({});
@@ -71,10 +94,7 @@ export function ExportDialog({ open, onOpenChange, pages, pois, autoDownload }: 
         setBusy(false);
         if (autoDownload && !didAutoDownload.current) {
           didAutoDownload.current = true;
-          const a = document.createElement('a');
-          a.href = res.pdfDataUrl;
-          a.download = fileName;
-          a.click();
+          triggerDownload(res.pdfDataUrl, fileName);
         }
       })
       .catch((e) => {
@@ -89,10 +109,7 @@ export function ExportDialog({ open, onOpenChange, pages, pois, autoDownload }: 
 
   const download = () => {
     if (!pdfDataUrl) return;
-    const a = document.createElement('a');
-    a.href = pdfDataUrl;
-    a.download = fileName;
-    a.click();
+    triggerDownload(pdfDataUrl, fileName);
   };
 
   return (

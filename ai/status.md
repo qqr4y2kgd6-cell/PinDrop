@@ -72,6 +72,8 @@
 - Grid lines, cartographic border (ticks, coordinate labels, alternating frame, grid refs), inset outlines, index lists and title blocks are drawn as true vector geometry/text in the PDF.
 - Crop marks and paper color per page; multi-page PDF.
 - Export Preview modal with mm-accurate page previews, vector map thumbnails (rendered from the same decoded tiles to canvas at 5 px/mm), Fit / 50% / 100% zoom (fit respects both width and height via ResizeObserver), "Rendering N map frames as vector/raster…" progress and a Download PDF button (auto-download when invoked from the Export PDF toolbar button).
+- PDF download works in Safari and Chrome: the data URL is converted to a Blob URL and the anchor is appended to the document before clicking (Safari rejects programmatic clicks / large data: URL downloads otherwise).
+- Preview grid overlay fixes: `GridOverlay` measures its layout box (`clientWidth`/`clientHeight`) instead of `getBoundingClientRect()`, so the grid/border/insets stay aligned with the map thumbnail even though the preview wraps the page in `transform: scale(...)` (the visual rect shrinks with the zoom and previously squeezed the overlay into the upper-left corner).
 
 ### Persistence
 - All state (POIs, pages, active page, viewports, index lists, title blocks, layout settings) persists to localStorage (`kart-eksporter-state`), with migration of legacy single-page/single-index state.
