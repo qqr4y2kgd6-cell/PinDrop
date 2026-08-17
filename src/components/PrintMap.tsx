@@ -127,6 +127,8 @@ export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapRef = useRef<Map | null>(null);
   const viewportRef = useRef(viewport);
+  const onViewportChangeRef = useRef(onViewportChange);
+  onViewportChangeRef.current = onViewportChange;
   const [dropPinMode, setDropPinMode] = useState(false);
   const dropPinModeRef = useRef(false);
   useEffect(() => {
@@ -311,7 +313,7 @@ export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
         const b = map.getBounds();
         updates.bbox = clampBbox([b.getWest(), b.getSouth(), b.getEast(), b.getNorth()]);
       }
-      onViewportChange(vp.id, updates);
+      onViewportChangeRef.current(vp.id, updates);
     });
 
     map.on('click', (e) => {

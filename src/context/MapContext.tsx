@@ -123,13 +123,14 @@ const PRESET_THEMES: Theme[] = [
     name: 'Classic',
     spotColor: '#e11d48',
     colorMode: 'spot',
+    layers: { roadColor: '#555555', buildingColor: '#d9d9d9', waterColor: '#b0c4de', parkColor: '#90c695', landColor: '#f5f5f0' },
   },
   {
     id: 'monochrome',
     name: 'Monochrome',
-    spotColor: '#71717a',
+    spotColor: '#525252',
     colorMode: 'grayscale',
-    layers: { roadColor: '#a1a1aa', buildingColor: '#d4d4d8', waterColor: '#94a3b8', parkColor: '#bbf7d0', landColor: '#fafaf9' },
+    layers: { roadColor: '#a3a3a3', buildingColor: '#d4d4d4', waterColor: '#b0b0b0', parkColor: '#c0c0c0', landColor: '#f5f5f5' },
   },
   {
     id: 'bw-bold',
