@@ -228,6 +228,9 @@ interface MapContextType {
   // POI editing
   editingPoiId: string | null;
   setEditingPoiId: (id: string | null) => void;
+  // Tab navigation
+  activeTab: 'layout' | 'map';
+  setActiveTab: (tab: 'layout' | 'map') => void;
   // Themes
   themes: Theme[];
   activeThemeId: string | null;
@@ -440,6 +443,7 @@ export function MapProvider({ children }: { children: ReactNode }) {
     [updatePage]
   );
 
+  const [activeTab, setActiveTab] = useState<'layout' | 'map'>('layout');
   const [editingPoiId, setEditingPoiId] = useState<string | null>(null);
 
   const [themes, setThemes] = useState<Theme[]>(() => loadThemesFromStorage());
@@ -453,15 +457,14 @@ export function MapProvider({ children }: { children: ReactNode }) {
     const theme = themes.find((t) => t.id === themeId);
     if (!theme) return;
     setActiveThemeId(themeId);
-    // Apply spotColor and colorMode to the active page
-    updateLayout({ spotColor: theme.spotColor, colorMode: theme.colorMode });
     // Apply layer overrides to the active viewport only
-    if (theme.layers && activeViewportId) {
+    if (activeViewportId) {
+      const currentLayers = layout.viewports.find((vp) => vp.id === activeViewportId)?.layers;
       updateViewport(activeViewportId, {
-        layers: { ...layout.viewports.find((vp) => vp.id === activeViewportId)?.layers, ...theme.layers } as Partial<MapLayerStyle>,
+        layers: { ...currentLayers, ...theme.layers, colorMode: theme.colorMode, spotColor: theme.spotColor } as Partial<MapLayerStyle>,
       });
     }
-  }, [themes, layout.viewports, activeViewportId, updateLayout, updateViewport]);
+  }, [themes, layout.viewports, activeViewportId, updateViewport]);
 
   const saveTheme = useCallback((name: string): string => {
     const id = `theme-${Date.now()}`;
@@ -514,6 +517,8 @@ export function MapProvider({ children }: { children: ReactNode }) {
         addPageTitleBlock,
         updatePageTitleBlock,
         removePageTitleBlock,
+        activeTab,
+        setActiveTab,
         editingPoiId,
         setEditingPoiId,
         themes,

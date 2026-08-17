@@ -5,7 +5,8 @@ import { Map } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { MapViewport, ColorMode } from '@/types';
 import { useMap } from '@/context/MapContext';
-import { applyLayerStyleOverrides, EDITOR_LABEL_SCALE } from '@/lib/mapStyle';
+import { applyLayerStyleOverrides } from '@/lib/mapStyle';
+import { CSS_PX_PER_MM } from '@/lib/units';
 import { createViewportMap, addViewportPois, applyViewportStyle, fitViewportBbox } from '@/lib/viewportMap';
 import { ensureMapWorker } from '@/lib/maplibreWorker';
 
@@ -47,16 +48,23 @@ export function PrintMapMini({ viewport, className, onLoad, onUpdate, spotColor:
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
+    const containerWidth = containerRef.current.clientWidth || 1;
+    const printWidthPx = viewport.positionOnPage.width * CSS_PX_PER_MM;
+    const tileLabelScale = Math.max(0.5, containerWidth / printWidthPx);
+
     const map = createViewportMap(containerRef.current, {
       viewport,
-      labelScale: EDITOR_LABEL_SCALE,
+      labelScale: tileLabelScale,
       interactive: false,
     });
 
     mapRef.current = map;
 
     const onStyleLoad = () => {
-      applyViewportStyle(map, { viewport, pois, colorMode, spotColor, labelScale: EDITOR_LABEL_SCALE });
+      const cw = containerRef.current?.clientWidth || 1;
+      const pw = viewport.positionOnPage.width * CSS_PX_PER_MM;
+      const ls = Math.max(0.5, cw / pw);
+      applyViewportStyle(map, { viewport, pois, colorMode, spotColor, labelScale: ls });
       if (onLoad) onLoad(map);
     };
 
@@ -139,7 +147,7 @@ export function PrintMapMini({ viewport, className, onLoad, onUpdate, spotColor:
     } else {
       map.once('style.load', update);
     }
-  }, [pois, colorMode, spotColor, viewport.visiblePoiIds, viewport.spiderify]);
+  }, [pois, colorMode, spotColor, viewport.visiblePoiIds, viewport.spiderify, viewport.poiMarkerScale]);
 
   // Apply the viewport's layer toggles/colors so the tile matches the editor
   // and the print. Also run once when the style first loads (the style.load
@@ -147,7 +155,12 @@ export function PrintMapMini({ viewport, className, onLoad, onUpdate, spotColor:
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    const apply = () => applyLayerStyleOverrides(map, viewport.layers, EDITOR_LABEL_SCALE);
+    const apply = () => {
+      const cw = containerRef.current?.clientWidth || 1;
+      const pw = viewport.positionOnPage.width * CSS_PX_PER_MM;
+      const ls = Math.max(0.5, cw / pw);
+      applyLayerStyleOverrides(map, viewport.layers, ls);
+    };
     if (map.isStyleLoaded()) {
       apply();
     } else {

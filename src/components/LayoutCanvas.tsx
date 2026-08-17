@@ -211,6 +211,7 @@ interface LayoutCanvasProps {
   onPageTitleBlockAdd: (pageId: string, config: TitleBlockConfig) => void;
   onPageTitleBlockUpdate: (pageId: string, blockId: string, updates: Partial<TitleBlockConfig>) => void;
   onPageTitleBlockRemove: (pageId: string, blockId: string) => void;
+  onOpenEditor?: (viewportId: string) => void;
 }
 
 export function LayoutCanvas({
@@ -233,6 +234,7 @@ export function LayoutCanvas({
   onPageTitleBlockAdd,
   onPageTitleBlockUpdate,
   onPageTitleBlockRemove,
+  onOpenEditor,
 }: LayoutCanvasProps) {
   const [paperZoom, setPaperZoom] = useState(1);
   const [showPageSettings, setShowPageSettings] = useState(true);
@@ -507,6 +509,7 @@ export function LayoutCanvas({
               activeViewportId={activeViewportId}
               onSelectPage={onSetActivePageId}
               onViewportSelect={onViewportSelect}
+              onOpenEditor={onOpenEditor}
               onPageViewportUpdate={onPageViewportUpdate}
               onPageViewportRemove={onPageViewportRemove}
               onPageIndexUpdate={onPageIndexUpdate}
@@ -612,6 +615,7 @@ function PageCanvas({
   activeViewportId,
   onSelectPage,
   onViewportSelect,
+  onOpenEditor,
   onPageViewportUpdate,
   onPageViewportRemove,
   onPageIndexUpdate,
@@ -626,6 +630,7 @@ function PageCanvas({
   activeViewportId: string | null;
   onSelectPage: (id: string) => void;
   onViewportSelect: (id: string | null) => void;
+  onOpenEditor?: (viewportId: string) => void;
   onPageViewportUpdate: (pageId: string, viewportId: string, updates: Partial<MapViewport>) => void;
   onPageViewportRemove: (pageId: string, viewportId: string) => void;
   onPageIndexUpdate: (pageId: string, indexId: string, updates: Partial<IndexListConfig>) => void;
@@ -1011,6 +1016,7 @@ function PageCanvas({
                         if (activeViewportId === item.i) onViewportSelect(null);
                       }}
                       onUpdate={(updates) => onPageViewportUpdate(page.id, item.i, updates)}
+                      onDoubleClick={() => onOpenEditor?.(vp.id)}
                     />
                   </div>
                 </div>
@@ -1690,6 +1696,17 @@ function PoiVisibilityEditor({ viewport, onUpdate }: {
         />
         Spiderify overlapping markers
       </Label>
+      <Field label={`Marker size (${(viewport.poiMarkerScale ?? 1).toFixed(1)}x)`}>
+        <input
+          type="range"
+          min={0.5}
+          max={3}
+          step={0.1}
+          value={viewport.poiMarkerScale ?? 1}
+          onChange={(e) => onUpdate(viewport.id, { poiMarkerScale: parseFloat(e.target.value) })}
+          className="w-full h-1.5 accent-current"
+        />
+      </Field>
       <div className="flex gap-1">
         <Button variant="outline" size="sm" className="h-7 flex-1 text-xs" onClick={() => setVisible(undefined)}>
           All

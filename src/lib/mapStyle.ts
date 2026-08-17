@@ -341,10 +341,10 @@ export const POI_LEG_SOURCE = 'poi-legs';
 /** Min badge center-to-center distance (CSS px) before spiderification kicks in. */
 const POI_SPIDER_MIN_DIST_PX = 18;
 
-function poiSpiderData(map: MapLibreMap, pois: POI[], spiderify = true) {
+function poiSpiderData(map: MapLibreMap, pois: POI[], spiderify = true, scale = 1) {
   const active = pois.filter((p) => p.active);
   const pts = active.map((p) => map.project([p.lng, p.lat]));
-  const laid = spiderify ? spiderifyPois(pts, POI_SPIDER_MIN_DIST_PX, active.map((p) => p.customNumber ?? p.id)) : pts.map((p) => ({ x: p.x, y: p.y, spidered: false, legFrom: undefined }));
+  const laid = spiderify ? spiderifyPois(pts, POI_SPIDER_MIN_DIST_PX * scale, active.map((p) => p.customNumber ?? p.id)) : pts.map((p) => ({ x: p.x, y: p.y, spidered: false, legFrom: undefined }));
   const badgeFeatures: Array<GeoJSON.Feature> = [];
   const legFeatures: Array<GeoJSON.Feature> = [];
   for (let i = 0; i < active.length; i++) {
@@ -372,8 +372,8 @@ function poiSpiderData(map: MapLibreMap, pois: POI[], spiderify = true) {
 }
 
 /** Re-computes spiderified POI badge positions for the current camera and updates both sources. */
-export function repositionPoiLayer(map: MapLibreMap, pois: POI[], spiderify = true) {
-  const data = poiSpiderData(map, pois, spiderify);
+export function repositionPoiLayer(map: MapLibreMap, pois: POI[], spiderify = true, scale = 1) {
+  const data = poiSpiderData(map, pois, spiderify, scale);
   const badgeSrc = map.getSource(POI_SOURCE) as GeoJSONSource | undefined;
   const legSrc = map.getSource(POI_LEG_SOURCE) as GeoJSONSource | undefined;
   if (badgeSrc) badgeSrc.setData(data.badges);
@@ -386,7 +386,7 @@ export function repositionPoiLayer(map: MapLibreMap, pois: POI[], spiderify = tr
  * Overlapping badges are spiderified apart with leader lines; positions are
  * recomputed whenever the camera moves.
  */
-export function addPoiLayer(map: MapLibreMap, pois: POI[], mode: ColorMode, spotColor: string, spiderify = true) {
+export function addPoiLayer(map: MapLibreMap, pois: POI[], mode: ColorMode, spotColor: string, spiderify = true, scale = 1) {
   const data = createPoiGeoJSON(pois);
   const colors = badgeColors(mode, spotColor);
 
@@ -416,10 +416,10 @@ export function addPoiLayer(map: MapLibreMap, pois: POI[], mode: ColorMode, spot
       type: 'circle',
       source: POI_SOURCE,
       paint: {
-        'circle-radius': 8,
+        'circle-radius': 8 * scale,
         'circle-color': colors.fill,
         'circle-stroke-color': '#ffffff',
-        'circle-stroke-width': 2,
+        'circle-stroke-width': 2 * scale,
       },
     });
     map.addLayer({
@@ -429,7 +429,7 @@ export function addPoiLayer(map: MapLibreMap, pois: POI[], mode: ColorMode, spot
       layout: {
         'text-field': ['get', 'number'],
         'text-font': ['Noto Sans Bold'],
-        'text-size': 9,
+        'text-size': 9 * scale,
         'text-allow-overlap': true,
       },
       paint: {
@@ -439,12 +439,15 @@ export function addPoiLayer(map: MapLibreMap, pois: POI[], mode: ColorMode, spot
       },
     });
   } else {
+    map.setPaintProperty('poi-badges', 'circle-radius', 8 * scale);
     map.setPaintProperty('poi-badges', 'circle-color', colors.fill);
+    map.setPaintProperty('poi-badges', 'circle-stroke-width', 2 * scale);
+    map.setLayoutProperty('poi-numbers', 'text-size', 9 * scale);
     map.setPaintProperty('poi-numbers', 'text-color', colors.text);
     map.setPaintProperty('poi-numbers', 'text-halo-color', colors.fill);
   }
 
-  const onReposition = () => repositionPoiLayer(map, pois, spiderify);
+  const onReposition = () => repositionPoiLayer(map, pois, spiderify, scale);
   map.off('moveend', onReposition);
   map.off('zoomend', onReposition);
   map.off('pitchend', onReposition);

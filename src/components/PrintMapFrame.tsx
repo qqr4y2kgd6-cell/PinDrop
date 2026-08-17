@@ -18,11 +18,12 @@ interface PrintMapFrameProps {
   onSelect: () => void;
   onRemove: () => void;
   onUpdate?: (updates: Partial<MapViewport>) => void;
+  onDoubleClick?: () => void;
   /** Page-level layout used for fallback fonts / spot color when provided. */
   layout?: PrintLayout;
 }
 
-export function PrintMapFrame({ viewport, isActive, onSelect, onRemove, onUpdate, layout: layoutProp }: PrintMapFrameProps) {
+export function PrintMapFrame({ viewport, isActive, onSelect, onRemove, onUpdate, onDoubleClick, layout: layoutProp }: PrintMapFrameProps) {
   const { layout: contextLayout } = useMap();
   const layout = layoutProp ?? contextLayout;
   const spotColor = layout.spotColor;
@@ -69,10 +70,12 @@ export function PrintMapFrame({ viewport, isActive, onSelect, onRemove, onUpdate
     <div
       className={cn(
         'absolute inset-0 group',
-        isActive && 'ring-2 ring-blue-500'
+        isActive && 'ring-2 ring-blue-500',
+        !showTitle && 'frame-drag-handle cursor-grab'
       )}
       style={frameStyle}
       onClick={onSelect}
+      onDoubleClick={(e) => { e.stopPropagation(); onDoubleClick?.(); }}
     >
       <div className="absolute top-1 right-1 flex gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
         <Button variant="ghost" size="icon" className="h-6 w-6 bg-white/80" onMouseDown={stopDrag} onClick={e => { e.stopPropagation(); onSelect(); onUpdate?.(zoomViewport(viewport, 1)); }} title="Zoom In">

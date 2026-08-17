@@ -84,6 +84,8 @@ export interface MapViewport {
    * `undefined` = on. When off, badges render at their true positions.
    */
   spiderify?: boolean;
+  /** Scale factor for POI marker size (1 = default). */
+  poiMarkerScale?: number;
   // Rotation of the whole tile, in 90° steps.
   rotation?: 0 | 90 | 180 | 270;
   // Layout appearance

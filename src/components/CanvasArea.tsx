@@ -12,11 +12,17 @@ export function CanvasArea() {
     updatePage, updatePageViewport, addPageViewport, removePageViewport,
     addPageIndexList, updatePageIndexList, removePageIndexList,
     addPageTitleBlock, updatePageTitleBlock, removePageTitleBlock,
+    activeTab, setActiveTab,
   } = useMap();
+
+  const handleOpenEditor = (viewportId: string) => {
+    setActiveViewportId(viewportId);
+    setActiveTab('map');
+  };
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      <Tabs defaultValue="layout" className="flex-1 flex flex-col">
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'layout' | 'map')} className="flex-1 flex flex-col">
         <TabsList className="border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-4">
           <TabsTrigger value="layout">Print Layout</TabsTrigger>
           <TabsTrigger value="map">Map Editor</TabsTrigger>
@@ -28,6 +34,7 @@ export function CanvasArea() {
             activePageId={activePageId}
             activeViewportId={activeViewportId}
             onViewportSelect={setActiveViewportId}
+            onOpenEditor={handleOpenEditor}
             onSetActivePageId={setActivePageId}
             onAddPage={addPage}
             onRemovePage={removePage}

@@ -123,7 +123,7 @@ function PlaceTierRow({ icon: Icon, label, style, allowItalic, allowUppercase, o
 }
 
 export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
-  const { pois, layout, updateLayout, addPoi, setEditingPoiId, themes, activeThemeId, applyTheme, saveTheme } = useMap();
+  const { pois, layout, addPoi, setEditingPoiId, themes, activeThemeId, applyTheme, saveTheme } = useMap();
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapRef = useRef<Map | null>(null);
   const viewportRef = useRef(viewport);
@@ -166,6 +166,7 @@ export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
   const contentH = Math.max(1, (viewport?.positionOnPage.height ?? 1) - (viewport?.showTitle !== false ? TITLE_BAR_MM : 0) - (layout.itemSpacing ?? 0));
   const areaRef = useRef<HTMLDivElement>(null);
   const [boxSize, setBoxSize] = useState<{ w: number; h: number } | null>(null);
+  const [containerReady, setContainerReady] = useState(false);
 
   useEffect(() => {
     const el = areaRef.current;
@@ -188,6 +189,10 @@ export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
     ro.observe(el);
     return () => ro.disconnect();
   }, [contentW, contentH]);
+
+  useEffect(() => {
+    if (boxSize && boxSize.w > 0 && boxSize.h > 0) setContainerReady(true);
+  }, [boxSize]);
 
   // Programmatic fits (initial fit, container resize) must not overwrite the
   // print bbox: the editor letterboxes the bbox to its own canvas aspect, so a
@@ -267,7 +272,7 @@ export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
   }, []);
 
   useEffect(() => {
-    if (!mapContainer.current || mapRef.current || !viewport) return;
+    if (!mapContainer.current || mapRef.current || !viewport || !containerReady) return;
 
     fittedRef.current.done = false;
 
@@ -282,7 +287,8 @@ export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
     mapRef.current = map;
 
     const onStyleReady = () => {
-      addPoiLayer(map, viewportActivePois(pois, viewport), colorMode, spotColor, viewport.spiderify !== false);
+      addPoiLayer(map, viewportActivePois(pois, viewport), colorMode, spotColor, viewport.spiderify !== false, viewport.poiMarkerScale ?? 1);
+      applyLayerStyleOverrides(map, viewport?.layers, EDITOR_LABEL_SCALE);
       if (viewport.bbox) {
         fitToBbox(map, viewport.bbox);
       }
@@ -354,7 +360,7 @@ export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
       mapRef.current = null;
       fittedRef.current.done = false;
     };
-  }, [viewport?.id, fitToBbox, ensureStyleReady, boxSize?.w, boxSize?.h]);
+  }, [viewport?.id, fitToBbox, ensureStyleReady, containerReady]);
 
   // Sync external center/zoom edits. When the viewport carries a `bbox`, that
   // is the authoritative framing (it drives the mini tiles and the export) and
@@ -386,23 +392,23 @@ export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
     if (!map || !viewport) return;
     const vpPois = viewportActivePois(pois, viewport);
     if (map.isStyleLoaded()) {
-      addPoiLayer(map, vpPois, colorMode, spotColor, viewport.spiderify !== false);
+      addPoiLayer(map, vpPois, colorMode, spotColor, viewport.spiderify !== false, viewport.poiMarkerScale ?? 1);
     } else {
-      map.once('style.load', () => addPoiLayer(map, vpPois, colorMode, spotColor, viewport.spiderify !== false));
+      map.once('style.load', () => addPoiLayer(map, vpPois, colorMode, spotColor, viewport.spiderify !== false, viewport.poiMarkerScale ?? 1));
     }
-  }, [pois, colorMode, spotColor, viewport?.id, viewport?.visiblePoiIds, viewport?.spiderify]);
+  }, [pois, colorMode, spotColor, viewport?.id, viewport?.visiblePoiIds, viewport?.spiderify, viewport?.poiMarkerScale]);
 
   // Layer styling overrides
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    const apply = () => applyLayerStyleOverrides(map, layers, EDITOR_LABEL_SCALE);
+    const apply = () => applyLayerStyleOverrides(map, viewport?.layers, EDITOR_LABEL_SCALE);
     if (map.isStyleLoaded()) {
       apply();
     } else {
       map.once('style.load', apply);
     }
-  }, [layers, viewport?.id]);
+  }, [viewport?.layers, viewport?.id]);
 
   const fitToPOIs = useCallback(() => {
     if (!mapRef.current) return;
