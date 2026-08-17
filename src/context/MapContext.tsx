@@ -1,11 +1,12 @@
 'use client';
 
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode } from 'react';
-import { POI, PrintLayout, PrintPage, MapViewport, IndexListConfig, TitleBlockConfig } from '@/types';
+import { POI, PrintLayout, PrintPage, MapViewport, IndexListConfig, TitleBlockConfig, Theme, MapLayerStyle } from '@/types';
 import { mockPois, initialLayout } from '@/data/mockPois';
 import { viewportBounds, clampBbox } from '@/lib/mapStyle';
 
 const STORAGE_KEY = 'pindrop-state';
+const THEMES_STORAGE_KEY = 'pindrop-themes';
 
 interface StoredState {
   pois: POI[];
@@ -116,6 +117,79 @@ function getInitialState(): StoredState {
   return { pois: mockPois, pages: [page], activePageId: page.id };
 }
 
+const PRESET_THEMES: Theme[] = [
+  {
+    id: 'classic',
+    name: 'Classic',
+    spotColor: '#e11d48',
+    colorMode: 'spot',
+  },
+  {
+    id: 'monochrome',
+    name: 'Monochrome',
+    spotColor: '#71717a',
+    colorMode: 'grayscale',
+    layers: { roadColor: '#a1a1aa', buildingColor: '#d4d4d8', waterColor: '#94a3b8', parkColor: '#bbf7d0', landColor: '#fafaf9' },
+  },
+  {
+    id: 'bw-bold',
+    name: 'B&W Bold',
+    spotColor: '#000000',
+    colorMode: 'bw',
+    layers: { roadColor: '#000000', buildingColor: '#000000', waterColor: '#ffffff', parkColor: '#ffffff', landColor: '#ffffff' },
+  },
+  {
+    id: 'ocean',
+    name: 'Ocean',
+    spotColor: '#0369a1',
+    colorMode: 'spot',
+    layers: { roadColor: '#7dd3fc', buildingColor: '#bae6fd', waterColor: '#0284c7', parkColor: '#a7f3d0', landColor: '#f0f9ff' },
+  },
+  {
+    id: 'forest',
+    name: 'Forest',
+    spotColor: '#166534',
+    colorMode: 'spot',
+    layers: { roadColor: '#86efac', buildingColor: '#d9f99d', waterColor: '#67e8f9', parkColor: '#bbf7d0', landColor: '#f7fee7' },
+  },
+  {
+    id: 'sunset',
+    name: 'Sunset',
+    spotColor: '#c2410c',
+    colorMode: 'spot',
+    layers: { roadColor: '#fdba74', buildingColor: '#fed7aa', waterColor: '#7dd3fc', parkColor: '#bef264', landColor: '#fef3c7' },
+  },
+  {
+    id: 'paper',
+    name: 'Paper',
+    spotColor: '#92400e',
+    colorMode: 'spot',
+    layers: { roadColor: '#d6d3d1', buildingColor: '#e7e5e4', waterColor: '#a5b4c4', parkColor: '#d9f0d1', landColor: '#faf9f6' },
+  },
+];
+
+function loadThemesFromStorage(): Theme[] {
+  if (typeof window === 'undefined') return PRESET_THEMES;
+  try {
+    const stored = localStorage.getItem(THEMES_STORAGE_KEY);
+    if (!stored) return PRESET_THEMES;
+    const parsed = JSON.parse(stored);
+    if (!Array.isArray(parsed)) return PRESET_THEMES;
+    return parsed;
+  } catch {
+    return PRESET_THEMES;
+  }
+}
+
+function saveThemesToStorage(themes: Theme[]) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(THEMES_STORAGE_KEY, JSON.stringify(themes));
+  } catch {
+    // ignore
+  }
+}
+
 interface MapContextType {
   pois: POI[];
   layout: PrintLayout;
@@ -125,7 +199,7 @@ interface MapContextType {
   setPois: (pois: POI[]) => void;
   updatePoi: (id: string, updates: Partial<POI>) => void;
   togglePoiActive: (id: string) => void;
-  addPoi: (poi: Omit<POI, 'id'>) => void;
+  addPoi: (poi: Omit<POI, 'id'> & { id?: string }) => void;
   removePoi: (id: string) => void;
   updateLayout: (updates: Partial<PrintLayout>) => void;
   updateViewport: (id: string, updates: Partial<MapViewport>) => void;
@@ -150,6 +224,15 @@ interface MapContextType {
   addPageTitleBlock: (pageId: string, config: TitleBlockConfig) => void;
   updatePageTitleBlock: (pageId: string, blockId: string, updates: Partial<TitleBlockConfig>) => void;
   removePageTitleBlock: (pageId: string, blockId: string) => void;
+  // POI editing
+  editingPoiId: string | null;
+  setEditingPoiId: (id: string | null) => void;
+  // Themes
+  themes: Theme[];
+  activeThemeId: string | null;
+  applyTheme: (themeId: string) => void;
+  saveTheme: (name: string) => string;
+  removeTheme: (id: string) => void;
 }
 
 const MapContext = createContext<MapContextType | undefined>(undefined);
@@ -202,10 +285,10 @@ export function MapProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
-  const addPoi = useCallback((poi: Omit<POI, 'id'>) => {
+  const addPoi = useCallback((poi: Omit<POI, 'id'> & { id?: string }) => {
     setState((prev) => {
       const maxNum = Math.max(0, ...prev.pois.map((p) => p.customNumber || 0));
-      const newPoi: POI = { ...poi, id: `poi-${Date.now()}`, customNumber: maxNum + 1 };
+      const newPoi: POI = { ...poi, id: poi.id ?? `poi-${Date.now()}`, customNumber: maxNum + 1 };
       return { ...prev, pois: [...prev.pois, newPoi] };
     });
   }, []);
@@ -356,6 +439,51 @@ export function MapProvider({ children }: { children: ReactNode }) {
     [updatePage]
   );
 
+  const [editingPoiId, setEditingPoiId] = useState<string | null>(null);
+
+  const [themes, setThemes] = useState<Theme[]>(() => loadThemesFromStorage());
+  const [activeThemeId, setActiveThemeId] = useState<string | null>(null);
+
+  useEffect(() => {
+    saveThemesToStorage(themes);
+  }, [themes]);
+
+  const applyTheme = useCallback((themeId: string) => {
+    const theme = themes.find((t) => t.id === themeId);
+    if (!theme) return;
+    setActiveThemeId(themeId);
+    // Apply spotColor and colorMode to the active page
+    updateLayout({ spotColor: theme.spotColor, colorMode: theme.colorMode });
+    // Apply layer overrides to all viewports on the active page
+    if (theme.layers) {
+      updatePage(activePageId, {
+        viewports: layout.viewports.map((vp) => ({
+          ...vp,
+          layers: { ...vp.layers, ...theme.layers } as Partial<MapLayerStyle>,
+        })),
+      });
+    }
+  }, [themes, layout.viewports, activePageId, updateLayout, updatePage]);
+
+  const saveTheme = useCallback((name: string): string => {
+    const id = `theme-${Date.now()}`;
+    const newTheme: Theme = {
+      id,
+      name,
+      spotColor: layout.spotColor,
+      colorMode: layout.colorMode ?? 'spot',
+      layers: layout.viewports[0]?.layers,
+    };
+    setThemes((prev) => [...prev, newTheme]);
+    setActiveThemeId(id);
+    return id;
+  }, [layout]);
+
+  const removeTheme = useCallback((id: string) => {
+    setThemes((prev) => prev.filter((t) => t.id !== id));
+    setActiveThemeId((prev) => (prev === id ? null : prev));
+  }, []);
+
   return (
     <MapContext.Provider
       value={{
@@ -388,6 +516,13 @@ export function MapProvider({ children }: { children: ReactNode }) {
         addPageTitleBlock,
         updatePageTitleBlock,
         removePageTitleBlock,
+        editingPoiId,
+        setEditingPoiId,
+        themes,
+        activeThemeId,
+        applyTheme,
+        saveTheme,
+        removeTheme,
       }}
     >
       {children}

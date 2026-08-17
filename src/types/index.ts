@@ -107,6 +107,18 @@ export interface MapViewport {
 export type ColorMode = 'bw' | 'grayscale' | 'spot';
 
 /**
+ * A visual theme bundles a spot color, color mode, and layer style overrides
+ * into a single reusable preset.
+ */
+export interface Theme {
+  id: string;
+  name: string;
+  spotColor: string;
+  colorMode: ColorMode;
+  layers?: Partial<MapLayerStyle>;
+}
+
+/**
  * Per-viewport map layer styling. `undefined` fields fall back to the print
  * defaults, so a viewport only stores the overrides the user actually changed.
  * Applied to the editor map, the layout mini tiles and the PDF export so all

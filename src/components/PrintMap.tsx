@@ -3,7 +3,7 @@
 import { useEffect, useRef, useCallback, useState, useMemo } from 'react';
 import { Map, LngLatBounds } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { MapViewport, ColorMode, MapLayerStyle, PlaceNameTierStyle, PlaceNamesConfig, PlaceNameLang } from '@/types';
+import { MapViewport, MapLayerStyle, PlaceNameTierStyle, PlaceNamesConfig, PlaceNameLang } from '@/types';
 import { useMap } from '@/context/MapContext';
 import { createPrintStyle, addPoiLayer, clampBbox, applyLayerStyleOverrides, DEFAULT_LAYER_STYLE, EDITOR_LABEL_SCALE, viewportActivePois, insetViewports, resolvePlaceNames, type PlaceNameTierKey } from '@/lib/mapStyle';
 import { TITLE_BAR_MM } from '@/lib/units';
@@ -123,7 +123,7 @@ function PlaceTierRow({ icon: Icon, label, style, allowItalic, allowUppercase, o
 }
 
 export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
-  const { pois, layout, updateLayout, addPoi } = useMap();
+  const { pois, layout, updateLayout, addPoi, setEditingPoiId, themes, activeThemeId, applyTheme, saveTheme } = useMap();
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapRef = useRef<Map | null>(null);
   const viewportRef = useRef(viewport);
@@ -140,8 +140,6 @@ export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
   }, [viewport]);
   const colorMode = layout.colorMode ?? 'spot';
   const spotColor = layout.spotColor;
-
-  const updateColorMode = (mode: ColorMode) => updateLayout({ colorMode: mode });
 
   const layers = useMemo(() => viewport?.layers ?? {}, [viewport?.layers]);
   const updateLayers = (changes: Partial<MapLayerStyle>) => {
@@ -319,6 +317,7 @@ export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
     map.on('click', (e) => {
       if (!dropPinModeRef.current) return;
       const { lat, lng } = e.lngLat;
+      const newId = `poi-${Date.now()}`;
       addPoi({
         name: 'New Pin',
         category: 'Food',
@@ -327,7 +326,10 @@ export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
         lng,
         active: true,
         customNumber: 0,
+        id: newId,
       });
+      setDropPinMode(false);
+      setEditingPoiId(newId);
     });
 
     const ro = new ResizeObserver(() => {
@@ -486,15 +488,15 @@ export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
 
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div className="flex flex-col gap-1">
-                <Label className="text-xs text-zinc-500">Color Mode</Label>
-                <Select value={colorMode} onValueChange={(v) => v && updateColorMode(v as ColorMode)}>
+                <Label className="text-xs text-zinc-500">Theme</Label>
+                <Select value={activeThemeId ?? ''} onValueChange={(v) => { if (v) applyTheme(v); }}>
                   <SelectTrigger className="text-xs h-7">
-                    <SelectValue />
+                    <SelectValue placeholder="Custom" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="bw">Pure B&W</SelectItem>
-                    <SelectItem value="grayscale">Grayscale</SelectItem>
-                    <SelectItem value="spot">Spot Color</SelectItem>
+                    {themes.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -505,6 +507,20 @@ export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
                   {viewport.showGrid ? 'On' : 'Off'}
                 </Button>
               </div>
+            </div>
+
+            <div className="flex gap-2 text-xs">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs flex-1"
+                onClick={() => {
+                  const name = prompt('Theme name:');
+                  if (name?.trim()) saveTheme(name.trim());
+                }}
+              >
+                Save as Theme
+              </Button>
             </div>
 
             <Button

@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { kml } from '@tmcw/togeojson';
 import { cn } from '@/lib/utils';
 import { reverseGeocode, delay } from '@/lib/geocode';
@@ -153,7 +153,7 @@ function parsePaste(text: string): ParsedPOI[] {
 }
 
 export function Sidebar() {
-  const { pois, updatePoi, togglePoiActive, setPois, addPoi, removePoi } = useMap();
+  const { pois, updatePoi, togglePoiActive, setPois, addPoi, removePoi, editingPoiId, setEditingPoiId } = useMap();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterRegion, setFilterRegion] = useState<string>('all');
   const [filterCategory, setFilterCategory] = useState<string>('all');
@@ -405,6 +405,8 @@ export function Sidebar() {
             onRemoveCategory={(oldCat: string) => {
               setPois(pois.map(p => p.category === oldCat ? { ...p, category: 'Food' } : p));
             }}
+            editingPoiId={editingPoiId}
+            onEditingPoiConsumed={() => setEditingPoiId(null)}
           />
         ))}
       </div>
@@ -536,13 +538,15 @@ export function Sidebar() {
   );
 }
 
-function POIItem({ poi, onToggle, onUpdate, onRemove, allCategories, onRemoveCategory }: {
+function POIItem({ poi, onToggle, onUpdate, onRemove, allCategories, onRemoveCategory, editingPoiId, onEditingPoiConsumed }: {
   poi: POI;
   onToggle: (id: string) => void;
   onUpdate: (id: string, updates: Partial<POI>) => void;
   onRemove: (id: string) => void;
   allCategories: string[];
   onRemoveCategory: (category: string) => void;
+  editingPoiId: string | null;
+  onEditingPoiConsumed: () => void;
 }) {
   const Icon = categoryIcons[poi.category] || MapPin;
   const isActive = poi.active;
@@ -560,6 +564,13 @@ function POIItem({ poi, onToggle, onUpdate, onRemove, allCategories, onRemoveCat
     notes: poi.notes ?? '',
     active: poi.active,
   });
+
+  useEffect(() => {
+    if (editingPoiId === poi.id) {
+      openEditor();
+      onEditingPoiConsumed();
+    }
+  }, [editingPoiId]);
 
   const openEditor = () => {
     setForm({
