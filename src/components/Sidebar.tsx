@@ -2,7 +2,7 @@
 
 import { useMap } from '@/context/MapContext';
 import { POI } from '@/types';
-import { Search, Upload, Download, Plus, GripVertical, MapPin, Utensils, Landmark, Building2, TreePine, Hotel } from 'lucide-react';
+import { Search, Upload, Download, Plus, GripVertical, Trash2, MapPin, Utensils, Landmark, Building2, TreePine, Hotel } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -152,7 +152,7 @@ function parsePaste(text: string): ParsedPOI[] {
 }
 
 export function Sidebar() {
-  const { pois, updatePoi, togglePoiActive, setPois, addPoi } = useMap();
+  const { pois, updatePoi, togglePoiActive, setPois, addPoi, removePoi } = useMap();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterRegion, setFilterRegion] = useState<string>('all');
   const [filterCategory, setFilterCategory] = useState<string>('all');
@@ -227,6 +227,7 @@ export function Sidebar() {
   }, [pois, setPois]);
 
   const [addPoiOpen, setAddPoiOpen] = useState(false);
+  const [clearAllOpen, setClearAllOpen] = useState(false);
   const [newPoi, setNewPoi] = useState({
     name: '',
     category: 'Food',
@@ -353,6 +354,10 @@ export function Sidebar() {
           <Plus className="h-4 w-4 mr-1" />
           Add POI
         </Button>
+        <Button variant="outline" size="sm" onClick={() => setClearAllOpen(true)} disabled={pois.length === 0} className="text-destructive hover:text-destructive">
+          <Trash2 className="h-4 w-4 mr-1" />
+          Clear All
+        </Button>
       </div>
 
       <Dialog open={addPoiOpen} onOpenChange={setAddPoiOpen}>
@@ -440,10 +445,23 @@ export function Sidebar() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={clearAllOpen} onOpenChange={setClearAllOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete All POIs</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-zinc-500">Are you sure you want to delete all {pois.length} POIs? This cannot be undone.</p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setClearAllOpen(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={() => { setPois([]); setClearAllOpen(false); }}>Delete All</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <ScrollArea className="min-h-0 flex-1">
         <div className="p-2 space-y-1">
           {filteredPois.map((poi) => (
-            <POIItem key={poi.id} poi={poi} onToggle={togglePoiActive} onUpdate={updatePoi} />
+            <POIItem key={poi.id} poi={poi} onToggle={togglePoiActive} onUpdate={updatePoi} onRemove={removePoi} />
           ))}
         </div>
       </ScrollArea>
@@ -451,10 +469,11 @@ export function Sidebar() {
   );
 }
 
-function POIItem({ poi, onToggle, onUpdate }: { poi: POI; onToggle: (id: string) => void; onUpdate: (id: string, updates: Partial<POI>) => void }) {
+function POIItem({ poi, onToggle, onUpdate, onRemove }: { poi: POI; onToggle: (id: string) => void; onUpdate: (id: string, updates: Partial<POI>) => void; onRemove: (id: string) => void }) {
   const Icon = categoryIcons[poi.category] || MapPin;
   const isActive = poi.active;
   const [open, setOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [form, setForm] = useState({
     customNumber: String(poi.customNumber ?? ''),
     name: poi.name,
@@ -523,6 +542,13 @@ function POIItem({ poi, onToggle, onUpdate }: { poi: POI; onToggle: (id: string)
           <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate">{poi.name}</p>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">{poi.cityRegion}</p>
         </div>
+        <button
+          onClick={(e) => { e.stopPropagation(); setConfirmDelete(true); }}
+          className="p-1 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-400 hover:text-destructive transition-colors"
+          title="Delete POI"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
@@ -621,6 +647,18 @@ function POIItem({ poi, onToggle, onUpdate }: { poi: POI; onToggle: (id: string)
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
             <Button onClick={save} disabled={!form.name || !form.cityRegion || !form.lat || !form.lng}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete POI</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-zinc-500">Delete &ldquo;{poi.name}&rdquo;? This cannot be undone.</p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmDelete(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={() => { onRemove(poi.id); setConfirmDelete(false); }}>Delete</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
