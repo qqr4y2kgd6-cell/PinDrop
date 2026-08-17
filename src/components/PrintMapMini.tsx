@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import { Map } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { MapViewport, ColorMode } from '@/types';
@@ -11,6 +11,9 @@ import { createViewportMap, addViewportPois, applyViewportStyle, fitViewportBbox
 import { ensureMapWorker } from '@/lib/maplibreWorker';
 
 ensureMapWorker();
+
+/** Approximate editor canvas width in CSS px. */
+const EDITOR_APPROX_WIDTH = 1000;
 
 interface PrintMapMiniProps {
   viewport: MapViewport;
@@ -25,12 +28,19 @@ interface PrintMapMiniProps {
  * Non-interactive preview map for a frame. When the viewport carries a `bbox`
  * the map is fitted to it exactly (matching the export renderer), so the
  * vector `GridOverlay` drawn over the frame aligns with the basemap.
+ *
+ * The map is rendered inside an oversized inner div (matching the editor's
+ * pixel width) and CSS-scaled down.  This forces MapLibre's fitBounds to
+ * compute the same zoom level as the editor, so the same detailed vector
+ * tiles (small roads, buildings, etc.) are fetched and rendered.
  */
 export function PrintMapMini({ viewport, className, onLoad, onUpdate, spotColor: spotColorProp, colorMode: colorModeProp }: PrintMapMiniProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
+  const outerRef = useRef<HTMLDivElement>(null);
+  const innerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<Map | null>(null);
   const onUpdateRef = useRef(onUpdate);
   const viewportRef = useRef(viewport);
+  const [outerSize, setOuterSize] = useState<{ w: number; h: number }>({ w: EDITOR_APPROX_WIDTH, h: EDITOR_APPROX_WIDTH });
 
   useEffect(() => {
     onUpdateRef.current = onUpdate;
@@ -45,14 +55,32 @@ export function PrintMapMini({ viewport, className, onLoad, onUpdate, spotColor:
     fitViewportBbox(map, viewportRef.current);
   }, []);
 
+  const scale = Math.min(outerSize.w / EDITOR_APPROX_WIDTH, 1);
+  const innerHeight = Math.round(outerSize.h * (EDITOR_APPROX_WIDTH / outerSize.w));
+
+  // Measure the outer (actual) container.
   useEffect(() => {
-    if (!containerRef.current || mapRef.current) return;
+    const outer = outerRef.current;
+    if (!outer) return;
+    const measure = () => {
+      const aw = outer.clientWidth || 1;
+      const ah = outer.clientHeight || 1;
+      setOuterSize((prev) => (prev.w === aw && prev.h === ah ? prev : { w: aw, h: ah }));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(outer);
+    return () => ro.disconnect();
+  }, []);
 
-    const containerWidth = containerRef.current.clientWidth || 1;
+  useEffect(() => {
+    const inner = innerRef.current;
+    if (!inner || mapRef.current) return;
+
     const printWidthPx = viewport.positionOnPage.width * CSS_PX_PER_MM;
-    const tileLabelScale = Math.max(0.5, containerWidth / printWidthPx);
+    const tileLabelScale = Math.max(0.5, EDITOR_APPROX_WIDTH / printWidthPx);
 
-    const map = createViewportMap(containerRef.current, {
+    const map = createViewportMap(inner, {
       viewport,
       labelScale: tileLabelScale,
       interactive: false,
@@ -61,9 +89,8 @@ export function PrintMapMini({ viewport, className, onLoad, onUpdate, spotColor:
     mapRef.current = map;
 
     const onStyleLoad = () => {
-      const cw = containerRef.current?.clientWidth || 1;
       const pw = viewport.positionOnPage.width * CSS_PX_PER_MM;
-      const ls = Math.max(0.5, cw / pw);
+      const ls = Math.max(0.5, EDITOR_APPROX_WIDTH / pw);
       applyViewportStyle(map, { viewport, pois, colorMode, spotColor, labelScale: ls });
       if (onLoad) onLoad(map);
     };
@@ -78,10 +105,6 @@ export function PrintMapMini({ viewport, className, onLoad, onUpdate, spotColor:
       const onUpdate = onUpdateRef.current;
       if (!onUpdate) return;
       const cur = viewportRef.current;
-      // A bbox-fitted tile must not write center/zoom: the fit defines the
-      // framing for the tile's small canvas, which is not the print camera.
-      // Writing it used to feed the editor's center/zoom sync, whose moveend
-      // recomputed an expanding bbox on every tab switch.
       if (cur.bbox) return;
       const center = map.getCenter();
       const updates: Partial<MapViewport> = {};
@@ -101,7 +124,7 @@ export function PrintMapMini({ viewport, className, onLoad, onUpdate, spotColor:
         fitToBbox(mapRef.current);
       }
     });
-    if (containerRef.current) ro.observe(containerRef.current);
+    ro.observe(inner);
 
     return () => {
       ro.disconnect();
@@ -156,9 +179,8 @@ export function PrintMapMini({ viewport, className, onLoad, onUpdate, spotColor:
     const map = mapRef.current;
     if (!map) return;
     const apply = () => {
-      const cw = containerRef.current?.clientWidth || 1;
       const pw = viewport.positionOnPage.width * CSS_PX_PER_MM;
-      const ls = Math.max(0.5, cw / pw);
+      const ls = Math.max(0.5, EDITOR_APPROX_WIDTH / pw);
       applyLayerStyleOverrides(map, viewport.layers, ls);
     };
     if (map.isStyleLoaded()) {
@@ -168,5 +190,17 @@ export function PrintMapMini({ viewport, className, onLoad, onUpdate, spotColor:
     }
   }, [viewport.layers]);
 
-  return <div ref={containerRef} className={className} style={{ width: '100%', height: '100%' }} />;
+  return (
+    <div ref={outerRef} className={className} style={{ width: '100%', height: '100%', overflow: 'hidden' }}>
+      <div
+        ref={innerRef}
+        style={{
+          width: `${EDITOR_APPROX_WIDTH}px`,
+          height: `${innerHeight}px`,
+          transform: `scale(${scale})`,
+          transformOrigin: '0 0',
+        }}
+      />
+    </div>
+  );
 }

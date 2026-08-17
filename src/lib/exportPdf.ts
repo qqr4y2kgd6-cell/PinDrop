@@ -169,17 +169,23 @@ function renderViewportImage(
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     const { w: mmW, h: mmH } = mapAreaSize(vp, itemSpacing);
-    const cssW = Math.max(2, Math.round(mmW * CSS_PX_PER_MM));
-    const cssH = Math.max(2, Math.round(mmH * CSS_PX_PER_MM));
-    const pixelRatio = EXPORT_DPI / (CSS_PX_PER_MM * 25.4);
+    const targetPixelRatio = EXPORT_DPI / (CSS_PX_PER_MM * 25.4);
+
+    // Create the off-screen container at the editor's approximate pixel width
+    // so that fitBounds computes the same zoom level as the on-screen editor.
+    // This ensures the same detailed vector tiles (small roads, buildings,
+    // etc.) are fetched.  The captured canvas is then drawn into the PDF at
+    // the correct print dimensions, with jsPDF scaling the image.
+    const EDITOR_APPROX_WIDTH = 1000;
+    const aspect = mmW / Math.max(0.1, mmH);
+    const cssW = EDITOR_APPROX_WIDTH;
+    const cssH = Math.max(2, Math.round(EDITOR_APPROX_WIDTH / aspect));
 
     const container = document.createElement('div');
     container.style.cssText = `position:fixed;left:-10000px;top:0;width:${cssW}px;height:${cssH}px;`;
     document.body.appendChild(container);
 
-    // Render through the same viewport-map setup as the layout tiles, at the
-    // editor label scale, so the PDF matches the on-screen layout WYSIWYG.
-    const map = createViewportMap(container, { viewport: vp, labelScale: EDITOR_LABEL_SCALE, pixelRatio });
+    const map = createViewportMap(container, { viewport: vp, labelScale: EDITOR_LABEL_SCALE, pixelRatio: targetPixelRatio });
 
     const timeout = window.setTimeout(() => {
       // 'idle' is rAF-driven, so in a throttled/background tab it may never fire.
