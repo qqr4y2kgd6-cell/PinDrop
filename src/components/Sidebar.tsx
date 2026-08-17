@@ -11,6 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { useState, useCallback } from 'react';
 import { kml } from '@tmcw/togeojson';
 import { cn } from '@/lib/utils';
+import { reverseGeocode, delay } from '@/lib/geocode';
+import { MapPinned, Loader2 } from 'lucide-react';
 
 const categoryIcons: Record<string, React.ComponentType<{ className?: string }>> = {
   'Food': Utensils,
@@ -229,6 +231,7 @@ export function Sidebar() {
   const [addPoiOpen, setAddPoiOpen] = useState(false);
   const [clearAllOpen, setClearAllOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
+  const [geocoding, setGeocoding] = useState(false);
   const [newPoi, setNewPoi] = useState({
     name: '',
     category: 'Food',
@@ -270,6 +273,23 @@ export function Sidebar() {
     updated.forEach(p => {
       updatePoi(p.id, { customNumber: num++ });
     });
+  }, [pois, updatePoi]);
+
+  const autoFillRegions = useCallback(async () => {
+    const missing = pois.filter(p => !p.cityRegion || p.cityRegion === 'Unknown');
+    if (missing.length === 0) return;
+    setGeocoding(true);
+    try {
+      for (const poi of missing) {
+        const region = await reverseGeocode(poi.lat, poi.lng);
+        if (region) {
+          updatePoi(poi.id, { cityRegion: region });
+        }
+        await delay(1100);
+      }
+    } finally {
+      setGeocoding(false);
+    }
   }, [pois, updatePoi]);
 
   return (
@@ -360,6 +380,16 @@ export function Sidebar() {
         <Button variant="outline" size="sm" onClick={() => setClearAllOpen(true)} disabled={pois.length === 0} className="w-full text-destructive hover:text-destructive">
           <Trash2 className="h-4 w-4 mr-1" />
           Clear All
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={autoFillRegions}
+          disabled={geocoding || pois.filter(p => !p.cityRegion || p.cityRegion === 'Unknown').length === 0}
+          className="w-full"
+        >
+          {geocoding ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <MapPinned className="h-4 w-4 mr-1" />}
+          {geocoding ? 'Geocoding...' : 'Auto-fill Regions'}
         </Button>
       </div>
 
