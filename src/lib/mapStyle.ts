@@ -1,5 +1,5 @@
-import type { StyleSpecification, GeoJSONSource, Map as MapLibreMap, FilterSpecification } from 'maplibre-gl';
-import type { POI, ColorMode, MapViewport, MapLayerStyle } from '@/types';
+import type { StyleSpecification, GeoJSONSource, Map as MapLibreMap, FilterSpecification, SymbolLayerSpecification } from 'maplibre-gl';
+import type { POI, ColorMode, MapViewport, MapLayerStyle, PlaceNameTierStyle, PlaceNamesConfig, PlaceNameLang } from '@/types';
 import { autoGridSpacing, buildGridGeometry, bboxToFrameRect, GRID_REF_LETTERS } from './grid';
 import { spiderify as spiderifyPois } from './spiderify';
 import { CSS_PX_PER_MM, TITLE_BAR_MM } from './units';
@@ -31,11 +31,194 @@ const ROADS: RoadSpec[] = [
 
 const PARK_CLASSES = ['park', 'forest', 'grass', 'garden', 'cemetery', 'meadow', 'heath', 'wood'];
 
+/** Settlement/admin place tiers (subset of `ResolvedPlaceNames` without water/road). */
+export type PlaceTier = 'country' | 'city' | 'town' | 'village' | 'suburb' | 'island';
+
+/** All stylable place-name tiers (every `ResolvedPlaceNames` key except the master `show`/`lang`). */
+export type PlaceNameTierKey = keyof Omit<ResolvedPlaceNames, 'show' | 'lang'>;
+
+/** `place` layer classes bucketed into each settlement/admin tier. */
+export const PLACE_TIER_CLASSES: Record<PlaceTier, string[]> = {
+  country: ['continent', 'country', 'state', 'province'],
+  city: ['city'],
+  town: ['town'],
+  village: ['village', 'hamlet', 'borough', 'isolated_dwelling'],
+  suburb: ['suburb', 'quarter', 'neighbourhood'],
+  island: ['island'],
+};
+
+/** Collision/draw priority per tier: lower = placed first = wins overlaps. */
+export const PLACE_TIER_SORT_KEY: Record<PlaceNameTierKey, number> = {
+  country: 0,
+  city: 1,
+  town: 2,
+  village: 3,
+  suburb: 4,
+  island: 5,
+  water: 6,
+  road: 7,
+};
+
+/** `water_name` layer classes (oceans, seas, lakes, rivers, bays, …). */
+export const WATER_NAME_CLASSES = ['ocean', 'sea', 'lake', 'river', 'canal', 'reservoir', 'bay', 'fjord', 'strait', 'lagoon', 'oxbow', 'water'];
+
+/** Road classes that get name labels (`minor` = residential/living streets; `service` = alleys/service roads; `path` = pedestrian streets/walkways; `track` = unpaved tracks). */
+export const ROAD_NAME_CLASSES = ['motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'minor', 'service', 'path', 'track'];
+
+/** Fully-resolved place-name style with every field on every tier filled in. */
+export interface ResolvedPlaceNames {
+  show: boolean;
+  lang: PlaceNameLang;
+  country: Required<PlaceNameTierStyle>;
+  city: Required<PlaceNameTierStyle>;
+  town: Required<PlaceNameTierStyle>;
+  village: Required<PlaceNameTierStyle>;
+  suburb: Required<PlaceNameTierStyle>;
+  island: Required<PlaceNameTierStyle>;
+  water: Required<PlaceNameTierStyle>;
+  road: Required<PlaceNameTierStyle>;
+}
+
+function defaultTier(color: string, sizeMm: number, bold = false, italic = false, uppercase = false): Required<PlaceNameTierStyle> {
+  return { show: false, color, sizeMm, bold, italic, uppercase, haloColor: '#ffffff', haloWidthMm: 0.3 };
+}
+
+export const DEFAULT_PLACE_NAMES: ResolvedPlaceNames = {
+  show: false,
+  lang: 'local',
+  country: defaultTier('#2f2f2f', 3.5, true, false, true),
+  city: defaultTier('#3f3f3f', 2.8, true),
+  town: defaultTier('#4a4a4a', 2.2, false),
+  village: defaultTier('#5a5a5a', 1.8, false),
+  suburb: defaultTier('#6a6a6a', 1.5, false),
+  island: defaultTier('#5a5a5a', 1.8, false, true),
+  water: defaultTier('#2b6cb0', 2, false, true),
+  road: defaultTier('#555555', 1.6, false),
+};
+
+/** Merges a partial `placeNames` config over the print defaults (all tiers off). */
+export function resolvePlaceNames(cfg?: PlaceNamesConfig): ResolvedPlaceNames {
+  return {
+    show: cfg?.show ?? DEFAULT_PLACE_NAMES.show,
+    lang: cfg?.lang ?? DEFAULT_PLACE_NAMES.lang,
+    country: { ...DEFAULT_PLACE_NAMES.country, ...cfg?.country },
+    city: { ...DEFAULT_PLACE_NAMES.city, ...cfg?.city },
+    town: { ...DEFAULT_PLACE_NAMES.town, ...cfg?.town },
+    village: { ...DEFAULT_PLACE_NAMES.village, ...cfg?.village },
+    suburb: { ...DEFAULT_PLACE_NAMES.suburb, ...cfg?.suburb },
+    island: { ...DEFAULT_PLACE_NAMES.island, ...cfg?.island },
+    water: { ...DEFAULT_PLACE_NAMES.water, ...cfg?.water },
+    road: { ...DEFAULT_PLACE_NAMES.road, ...cfg?.road },
+  };
+}
+
+/**
+ * Text-size expression, scaled by `rank` (lower = more important) the way real
+ * maps emphasize bigger places. `rank` only exists on country/state/city/town
+ * features; other classes fall back to the top end of the range.
+ */
+function rankTextSizeExpr(sizeMm: number, maxRank: number, maxScale: number, minScale: number, pxPerMm: number) {
+  return [
+    'interpolate',
+    ['linear'],
+    ['coalesce', ['get', 'rank'], maxRank],
+    1,
+    sizeMm * maxScale * pxPerMm,
+    maxRank,
+    sizeMm * minScale * pxPerMm,
+  ] as unknown as number;
+}
+
+function placeNameLayer(
+  id: string,
+  sourceLayer: string,
+  filter: FilterSpecification,
+  layout: SymbolLayerSpecification['layout'],
+  paint: SymbolLayerSpecification['paint']
+): SymbolLayerSpecification {
+  return {
+    id,
+    type: 'symbol',
+    source: 'openmaptiles',
+    'source-layer': sourceLayer,
+    filter,
+    layout: { visibility: 'none', 'text-field': ['get', 'name'], ...layout },
+    paint,
+  };
+}
+
+/**
+ * Label symbol layers for the place-name hierarchy (added above roads, below POIs).
+ *
+ * `labelScale` is an extra CSS-px multiplier for on-screen previews (editor +
+ * layout tiles) only — the raster export and vector renderer use `1` so the
+ * printed mm sizes stay physically exact. The editor renders everything at half
+ * physical scale (`CSS_PX_PER_MM = 2` CSS px/mm), which makes small print sizes
+ * unreadable on screen; the editor passes `EDITOR_LABEL_SCALE` (2) to double
+ * the on-screen text while preserving the tier hierarchy.
+ *
+ * `symbol-sort-key` makes more important tiers win collision placement: features
+ * are placed in ascending sort-key order, so the first placed symbol keeps its
+ * spot. country/city/town … beat island/water/road, and water no longer hides
+ * settlement names.
+ */
+function placeNameStyleLayers(labelScale = 1): StyleSpecification['layers'] {
+  const n = DEFAULT_PLACE_NAMES;
+  const pxPerMm = CSS_PX_PER_MM * labelScale;
+  const textSize = (sizeMm: number) => sizeMm * pxPerMm;
+  const font = (tier: Required<PlaceNameTierStyle>) => (tier.bold ? 'Noto Sans Bold' : tier.italic ? 'Noto Sans Italic' : 'Noto Sans Regular');
+  const halo = (tier: Required<PlaceNameTierStyle>) => ({
+    'text-color': tier.color,
+    'text-halo-color': tier.haloColor,
+    'text-halo-width': tier.haloWidthMm * pxPerMm,
+  });
+
+  const placeLayer = (tier: PlaceTier, rankExpr?: number, transform?: 'uppercase' | 'none' | 'lowercase') => {
+    const t = n[tier];
+    const caseTransform: 'uppercase' | 'none' | 'lowercase' = transform ?? (t.uppercase ? 'uppercase' : 'none');
+    return placeNameLayer(
+      `place-${tier}`,
+      'place',
+      ['in', 'class', ...PLACE_TIER_CLASSES[tier]] as FilterSpecification,
+      {
+        'text-font': [font(t)],
+        'text-size': rankExpr ?? textSize(t.sizeMm),
+        'symbol-sort-key': PLACE_TIER_SORT_KEY[tier],
+        ...(t.uppercase || transform ? { 'text-transform': caseTransform } : {}),
+      },
+      halo(t)
+    );
+  };
+
+  return [
+    placeNameLayer(
+      'water-name',
+      'water_name',
+      ['all', ['in', 'class', ...WATER_NAME_CLASSES], ['has', 'name']] as FilterSpecification,
+      { 'text-font': [font(n.water)], 'text-size': textSize(n.water.sizeMm), 'symbol-sort-key': PLACE_TIER_SORT_KEY.water },
+      halo(n.water)
+    ),
+    placeLayer('island'),
+    placeLayer('country', rankTextSizeExpr(n.country.sizeMm, 6, 1.15, 0.8, pxPerMm)),
+    placeLayer('city', rankTextSizeExpr(n.city.sizeMm, 10, 1.25, 0.7, pxPerMm)),
+    placeLayer('town', rankTextSizeExpr(n.town.sizeMm, 10, 1.2, 0.8, pxPerMm)),
+    placeLayer('village'),
+    placeLayer('suburb'),
+    placeNameLayer(
+      'road-name',
+      'transportation_name',
+      ['all', ['in', 'class', ...ROAD_NAME_CLASSES], ['has', 'name']] as FilterSpecification,
+      { 'symbol-placement': 'line', 'symbol-spacing': Math.round(300 * labelScale), 'symbol-sort-key': PLACE_TIER_SORT_KEY.road, 'text-font': [font(n.road)], 'text-size': textSize(n.road.sizeMm), 'text-letter-spacing': 0.05 },
+      halo(n.road)
+    ),
+  ];
+}
+
 /**
  * A minimalist, print-optimized vector map style built on OpenFreeMap tiles.
  * High contrast, thin crisp roads, flat fills and no label clutter.
  */
-export function createPrintStyle(): StyleSpecification {
+export function createPrintStyle(labelScale = 1): StyleSpecification {
   const layers: StyleSpecification['layers'] = [
     {
       id: 'background',
@@ -114,6 +297,7 @@ export function createPrintStyle(): StyleSpecification {
         'line-dasharray': [2, 2],
       },
     },
+    ...placeNameStyleLayers(labelScale),
   ];
 
   return {
@@ -123,6 +307,9 @@ export function createPrintStyle(): StyleSpecification {
     layers,
   };
 }
+
+/** On-screen multiplier for place-name text (editor + layout preview only). */
+export const EDITOR_LABEL_SCALE = 2;
 
 export const ROAD_LAYER_IDS = ROADS.map((r) => r.id);
 
@@ -300,6 +487,7 @@ export const DEFAULT_LAYER_STYLE: Required<MapLayerStyle> = {
   parkColor: '#eaeaea',
   parkOpacity: 1,
   landColor: '#ffffff',
+  placeNames: DEFAULT_PLACE_NAMES,
 };
 
 function setLayerVisibility(map: MapLibreMap, ids: string[], visible: boolean) {
@@ -319,8 +507,9 @@ function setLayerVisibility(map: MapLibreMap, ids: string[], visible: boolean) {
  * gate here. Each layer op is guarded with `getLayer` instead, which only
  * succeeds once the style JSON is applied.
  */
-export function applyLayerStyleOverrides(map: MapLibreMap, layers?: MapLayerStyle) {
+export function applyLayerStyleOverrides(map: MapLibreMap, layers?: MapLayerStyle, labelScale = 1) {
   const l = { ...DEFAULT_LAYER_STYLE, ...layers };
+  const pxPerMm = CSS_PX_PER_MM * labelScale;
 
   if (l.showRoads) {
     ROAD_SPECS.forEach(({ id, w, o }) => {
@@ -376,6 +565,32 @@ export function applyLayerStyleOverrides(map: MapLibreMap, layers?: MapLayerStyl
   if (map.getLayer('background')) {
     map.setPaintProperty('background', 'background-color', l.landColor);
   }
+
+  const pn = resolvePlaceNames(l.placeNames);
+  const englishText = pn.lang === 'english';
+  const setTier = (id: string, tier: Required<PlaceNameTierStyle>, opts: { font: string; size: number; uppercase?: boolean; letterSpacing?: number }) => {
+    if (!map.getLayer(id)) return;
+    const visible = pn.show && tier.show;
+    map.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none');
+    if (!visible) return;
+    map.setLayoutProperty(id, 'text-field', englishText ? ['coalesce', ['get', 'name:en'], ['get', 'name_en'], ['get', 'name:latin'], ['get', 'name']] : ['get', 'name']);
+    map.setLayoutProperty(id, 'text-font', [opts.font]);
+    map.setLayoutProperty(id, 'text-size', opts.size);
+    if (opts.uppercase !== undefined) map.setLayoutProperty(id, 'text-transform', opts.uppercase ? 'uppercase' : 'none');
+    if (opts.letterSpacing !== undefined) map.setLayoutProperty(id, 'text-letter-spacing', opts.letterSpacing);
+    map.setPaintProperty(id, 'text-color', tier.color);
+    map.setPaintProperty(id, 'text-halo-color', tier.haloColor);
+    map.setPaintProperty(id, 'text-halo-width', tier.haloWidthMm * pxPerMm);
+  };
+
+  setTier('water-name', pn.water, { font: pn.water.italic ? 'Noto Sans Italic' : 'Noto Sans Regular', size: pn.water.sizeMm * pxPerMm });
+  setTier('place-island', pn.island, { font: pn.island.italic ? 'Noto Sans Italic' : 'Noto Sans Regular', size: pn.island.sizeMm * pxPerMm });
+  setTier('place-country', pn.country, { font: 'Noto Sans Bold', size: rankTextSizeExpr(pn.country.sizeMm, 6, 1.15, 0.8, pxPerMm), uppercase: true });
+  setTier('place-city', pn.city, { font: 'Noto Sans Bold', size: rankTextSizeExpr(pn.city.sizeMm, 10, 1.25, 0.7, pxPerMm) });
+  setTier('place-town', pn.town, { font: pn.town.bold ? 'Noto Sans Bold' : 'Noto Sans Regular', size: rankTextSizeExpr(pn.town.sizeMm, 10, 1.2, 0.8, pxPerMm) });
+  setTier('place-village', pn.village, { font: pn.village.bold ? 'Noto Sans Bold' : 'Noto Sans Regular', size: pn.village.sizeMm * pxPerMm });
+  setTier('place-suburb', pn.suburb, { font: pn.suburb.bold ? 'Noto Sans Bold' : 'Noto Sans Regular', size: pn.suburb.sizeMm * pxPerMm });
+  setTier('road-name', pn.road, { font: pn.road.bold ? 'Noto Sans Bold' : 'Noto Sans Regular', size: pn.road.sizeMm * pxPerMm, letterSpacing: 0.05 });
 }
 
 /** Bounding box: [minLng, minLat, maxLng, maxLat] */

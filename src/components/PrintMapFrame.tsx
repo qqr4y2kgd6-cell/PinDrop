@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useMap } from '@/context/MapContext';
 import { titleFontCss } from '@/lib/titleFonts';
-import { CSS_PX_PER_MM } from '@/lib/units';
+import { CSS_PX_PER_MM, TITLE_BAR_MM } from '@/lib/units';
 import { zoomViewport, insetViewports } from '@/lib/mapStyle';
 import { autoGridSpacing, spacingLabel } from '@/lib/grid';
 
@@ -36,6 +36,10 @@ export function PrintMapFrame({ viewport, isActive, onSelect, onRemove, onUpdate
   const titleTextColor = viewport.titleTextColor || layout.defaultTitleTextColor || (titleBackground ? '#ffffff' : '#1a1a1a');
   const titleFontSize = Math.max(6, (viewport.titleFontSize ?? layout.titleFontSize ?? 3) * CSS_PX_PER_MM);
   const titleFontWeight = viewport.titleFontWeight ?? layout.titleFontWeight ?? 'bold';
+  // The title bar is a fixed print-height band (TITLE_BAR_MM), matching the
+  // export's frame body so a bbox fit shows exactly the same extent in the
+  // layout tile and the PDF.
+  const titleBarHeight = `${TITLE_BAR_MM * CSS_PX_PER_MM}px`;
   const showGridIndicator = viewport.showGrid && viewport.showGridIndicator !== false && !!viewport.bbox;
   const gridIndicator = showGridIndicator
     ? `Grid = ${spacingLabel(viewport.gridSpacing ?? autoGridSpacing(viewport.bbox!))} × ${spacingLabel(viewport.gridSpacing ?? autoGridSpacing(viewport.bbox!))}`
@@ -58,6 +62,7 @@ export function PrintMapFrame({ viewport, isActive, onSelect, onRemove, onUpdate
     fontFamily: titleFontCss(viewport.titleFontFamily ?? layout.titleFontFamily),
     fontSize: `${titleFontSize}px`,
     fontWeight: titleFontWeight,
+    height: titleBarHeight,
   };
 
   return (
@@ -84,7 +89,7 @@ export function PrintMapFrame({ viewport, isActive, onSelect, onRemove, onUpdate
       <div className="absolute inset-0 flex flex-col">
         {showTitle && (
           <div
-            className="frame-drag-handle flex items-center justify-between gap-2 px-2.5 py-1 uppercase tracking-[0.12em] shrink-0 cursor-grab"
+            className="frame-drag-handle flex items-center justify-between gap-2 px-2.5 uppercase tracking-[0.12em] shrink-0 cursor-grab overflow-hidden"
             style={titleBarStyle}
           >
             <span className="truncate">{viewport.title}</span>

@@ -1,16 +1,16 @@
 'use client';
 
-import { Map as MapLibreMap } from 'maplibre-gl';
 import { jsPDF, GState } from 'jspdf';
-import { PrintLayout, PrintPage, POI, MapViewport, IndexListConfig, TitleBlockConfig, Rect } from '@/types';
-import { createPrintStyle, addPoiLayer, repositionPoiLayer, computeGridRefs, clampBbox, applyLayerStyleOverrides, viewportActivePois, insetViewports } from './mapStyle';
+import { PrintLayout, PrintPage, POI, MapViewport, ColorMode, IndexListConfig, TitleBlockConfig, Rect } from '@/types';
+import { computeGridRefs, insetViewports, EDITOR_LABEL_SCALE } from './mapStyle';
+import { createViewportMap, applyViewportStyle } from './viewportMap';
 import { ensureMapWorker } from './maplibreWorker';
 import { titleFontPdf } from './titleFonts';
 import { resolveIndexConfig, buildIndexGroups, distributeGroups, scopePois } from './indexStyle';
 import { indexIconFor, drawIndexIcon } from './indexIcons';
 import { footprintDims, TITLE_BAR_MM } from './units';
 import { autoGridSpacing, spacingLabel, buildGridGeometry, buildBorder, bboxToFrameRect, buildBorderFrameSegments, buildGridRefLabels, buildInsetRect } from './grid';
-import { fetchViewportMap, buildVectorMapRenderData, drawVectorMapPdf, drawPoiBadgesPdf, renderMapThumbnail, hexToRgb, type VectorMapData } from './vectorMap';
+import { hexToRgb } from './vectorMap';
 
 ensureMapWorker();
 
@@ -22,9 +22,6 @@ export interface ExportResult {
   images: Record<string, string>;
   pages: PrintPage[];
 }
-
-/** How the map frames are rendered in the exported PDF. */
-export type ExportRenderMode = 'vector' | 'raster';
 
 export function pageSizeMm(layout: PrintLayout) {
   if (layout.pageSize === 'Custom') {
@@ -39,11 +36,33 @@ export function pageSizeMm(layout: PrintLayout) {
   return layout.orientation === 'landscape' ? [h, w] : [w, h];
 }
 
-function mapAreaSize(vp: MapViewport, itemSpacing = 0) {
+/**
+ * The map-body box (mm) inside a frame, shared by the layout tile, the export
+ * preview and the PDF so the map is inset by the frame border exactly like the
+ * on-screen layout. The layout renders the mini tile inside the frame's content
+ * box (border-box, so the border is `bw` on each side) and below the title bar;
+ * the export must place the raster at that same inset box or the rounded
+ * corners / edges will not match the layout.
+ */
+function mapBodyBox(vp: MapViewport, itemSpacing = 0) {
+  const border = vp.borderWidth ?? 1;
   const title = vp.showTitle !== false ? TITLE_BAR_MM : 0;
   const fp = footprintDims(vp.rotation, vp.positionOnPage.width, vp.positionOnPage.height);
   const pad = itemSpacing / 2;
-  return { w: Math.max(1, fp.w - pad * 2), h: Math.max(1, fp.h - title - pad * 2) };
+  const bw = Math.max(1, fp.w - pad * 2);
+  const bh = Math.max(1, fp.h - pad * 2);
+  return {
+    x: border,
+    y: (title ? border + title : border),
+    w: Math.max(1, bw - border * 2),
+    h: Math.max(1, bh - title - border * 2),
+  };
+}
+
+/** Size of the map-body box used as the offscreen render canvas. */
+function mapAreaSize(vp: MapViewport, itemSpacing = 0) {
+  const b = mapBodyBox(vp, itemSpacing);
+  return { w: b.w, h: b.h };
 }
 
 /**
@@ -70,6 +89,34 @@ function roundedBottomPath(x: number, y: number, w: number, h: number, r: number
     { op: 'l', c: [x + rr, y + h] },
     { op: 'c', c: [x + rr - k, y + h, x, y + h - rr + k, x, y + h - rr] },
     { op: 'l', c: [x, y] },
+    { op: 'h', c: [] },
+  ];
+}
+
+/**
+ * Path data for a rect whose two top corners are rounded by `r` (bottom corners
+ * stay square). Used to fill the (border-inset) title bar with corners that
+ * match the frame's outer radius.
+ */
+function roundedTopPath(x: number, y: number, w: number, h: number, r: number) {
+  const rr = Math.min(Math.max(0, r), w / 2, h);
+  if (rr <= 0) {
+    return [
+      { op: 'm', c: [x, y + h] },
+      { op: 'l', c: [x, y] },
+      { op: 'l', c: [x + w, y] },
+      { op: 'l', c: [x + w, y + h] },
+      { op: 'h', c: [] },
+    ];
+  }
+  const k = 0.5523 * rr;
+  return [
+    { op: 'm', c: [x, y + h] },
+    { op: 'l', c: [x, y + rr] },
+    { op: 'c', c: [x, y + rr - k, x + rr - k, y, x + rr, y] },
+    { op: 'l', c: [x + w - rr, y] },
+    { op: 'c', c: [x + w - rr + k, y, x + w, y + rr - k, x + w, y + rr] },
+    { op: 'l', c: [x + w, y + h] },
     { op: 'h', c: [] },
   ];
 }
@@ -116,7 +163,7 @@ function withRotation(doc: jsPDF, angle: number | undefined, cx: number, cy: num
 function renderViewportImage(
   vp: MapViewport,
   pois: POI[],
-  colorMode: PrintLayout['colorMode'],
+  colorMode: ColorMode,
   spotColor: string,
   itemSpacing = 0
 ): Promise<string> {
@@ -130,23 +177,15 @@ function renderViewportImage(
     container.style.cssText = `position:fixed;left:-10000px;top:0;width:${cssW}px;height:${cssH}px;`;
     document.body.appendChild(container);
 
-    const map = new MapLibreMap({
-      container,
-      style: createPrintStyle(),
-      center: vp.center,
-      zoom: vp.zoom,
-      bearing: vp.rotation ?? 0,
-      attributionControl: false,
-      canvasContextAttributes: { preserveDrawingBuffer: true, antialias: true },
-      pixelRatio,
-    });
+    // Render through the same viewport-map setup as the layout tiles, at the
+    // editor label scale, so the PDF matches the on-screen layout WYSIWYG.
+    const map = createViewportMap(container, { viewport: vp, labelScale: EDITOR_LABEL_SCALE, pixelRatio });
 
     const timeout = window.setTimeout(() => {
       // 'idle' is rAF-driven, so in a throttled/background tab it may never fire.
       // If the style loaded, redraw() paints whatever tiles are ready synchronously
       // so we can capture a partial map instead of waiting forever. If the style
-      // never loaded (e.g. throttled tab), the canvas is empty/black — reject so
-      // the caller falls back to the vector renderer instead of embedding a blank.
+      // never loaded (e.g. throttled tab), the canvas is empty/black — reject.
       let url = '';
       if (map.isStyleLoaded()) {
         const canvas = container.querySelector('canvas');
@@ -197,26 +236,17 @@ function renderViewportImage(
       void e;
     });
 
-    if (vp.bbox) {
-      map.on('load', () => {
-        const b = clampBbox(vp.bbox!);
-        map.fitBounds(
-          [
-            [b[0], b[1]],
-            [b[2], b[3]],
-          ],
-          { padding: 0, duration: 0, bearing: vp.rotation ?? 0 }
-        );
-      });
-    }
-
-    map.on('load', () => {
-      if (!map.isStyleLoaded()) return;
-      addPoiLayer(map, viewportActivePois(pois, vp), colorMode ?? 'spot', spotColor, vp.spiderify !== false);
-      repositionPoiLayer(map, viewportActivePois(pois, vp), vp.spiderify !== false);
-      applyLayerStyleOverrides(map, vp.layers);
+    // Apply POIs, layer overrides and the bbox fit once the style is applied,
+    // then capture after the map reaches idle (first full render).
+    const ready = () => {
+      applyViewportStyle(map, { viewport: vp, pois, colorMode, spotColor, labelScale: EDITOR_LABEL_SCALE });
       map.once('idle', finish);
-    });
+    };
+    if (map.isStyleLoaded()) {
+      ready();
+    } else {
+      map.once('style.load', ready);
+    }
   });
 }
 
@@ -629,7 +659,7 @@ function drawInsetsPdf(doc: jsPDF, page: PrintLayout, vp: MapViewport, area: { x
   }
 }
 
-function drawViewportPdf(doc: jsPDF, page: PrintLayout, vp: MapViewport, pois: POI[], img?: string, vector?: VectorMapData) {
+function drawViewportPdf(doc: jsPDF, page: PrintLayout, vp: MapViewport, img?: string) {
   const p = vp.positionOnPage;
   const fp = footprintDims(vp.rotation, p.width, p.height);
   // itemSpacing is symmetric padding: inset the whole frame so the fold lines
@@ -642,6 +672,17 @@ function drawViewportPdf(doc: jsPDF, page: PrintLayout, vp: MapViewport, pois: P
   const title = vp.showTitle !== false;
   const titleH = title ? TITLE_BAR_MM : 0;
   const radius = vp.roundedCorners ? (vp.cornerRadius ?? 4) : 0;
+  // The map body is inset by the frame border on all sides, exactly like the
+  // layout tile inside the frame's border-box → the map edges + rounded corners
+  // match the on-screen layout. Title bar is inset by the border too.
+  const border = vp.borderWidth ?? 1;
+  const body = mapBodyBox(vp, page.itemSpacing ?? 0);
+  const tx = bx + border;
+  const ty = by + border;
+  const tw = bw - border * 2;
+  // Content is clipped to the frame's *inner* radius (CSS clips the padding box
+  // at border-radius − border-width), so the corners match the layout tile.
+  const innerRadius = Math.max(0, radius - border);
 
   // Map background
   const [fbr, fbg, fbb] = hexToRgb(vp.backgroundColor || '#ffffff');
@@ -655,15 +696,16 @@ function drawViewportPdf(doc: jsPDF, page: PrintLayout, vp: MapViewport, pois: P
     const [tr, tg, tb] = hexToRgb(tbg);
     doc.setFillColor(tr, tg, tb);
     if (radius > 0) {
-      doc.roundedRect(bx, by, bw, titleH, radius, radius, 'F');
-      doc.rect(bx, by + titleH / 2, bw, titleH / 2, 'F');
+      doc.path(roundedTopPath(tx, ty, tw, titleH, innerRadius));
+      doc.fill();
+      doc.discardPath();
     } else {
-      doc.rect(bx, by, bw, titleH, 'F');
+      doc.rect(tx, ty, tw, titleH, 'F');
     }
     if (!withBg) {
       doc.setDrawColor(26, 26, 26);
       doc.setLineWidth(0.2);
-      doc.line(bx, by + titleH, bx + bw, by + titleH);
+      doc.line(tx, ty + titleH, tx + tw, ty + titleH);
     }
     const titleTextColor = vp.titleTextColor || page.defaultTitleTextColor || (withBg ? '#ffffff' : '#1a1a1a');
     const [ttr, ttg, ttb] = hexToRgb(titleTextColor);
@@ -675,49 +717,29 @@ function drawViewportPdf(doc: jsPDF, page: PrintLayout, vp: MapViewport, pois: P
     });
     doc.setFont(tf.family, tf.style);
     doc.setFontSize(tf.sizeMm * MM_TO_PT);
-    doc.text(vp.title.toUpperCase(), bx + 2.5, by + titleH - 1.8);
+    doc.text(vp.title.toUpperCase(), tx + 2.5, ty + titleH - 1.8);
     // Real-world grid size indicator (right-aligned), matching the editor title bar.
     if (vp.showGrid && vp.showGridIndicator !== false && vp.bbox) {
       const spacing = vp.gridSpacing ?? autoGridSpacing(vp.bbox);
       const indicator = `Grid = ${spacingLabel(spacing)} × ${spacingLabel(spacing)}`;
       doc.setFontSize(Math.max(1.2, tf.sizeMm * 0.6) * MM_TO_PT);
-      doc.text(indicator, bx + bw - 2.5, by + titleH - 1.8, { align: 'right' });
+      doc.text(indicator, tx + tw - 2.5, ty + titleH - 1.8, { align: 'right' });
     }
   }
 
-  // Map content: vector tiles (preferred) or the 300-DPI raster fallback.
-  // The vector map is drawn rotated like the raster was, over a region covering
-  // the whole frame (so rotated corners stay filled), clipped to the frame.
-  if (vector && vector.tiles.length > 0) {
-    const area = { x: bx, y: by + titleH, width: bw, height: bh - titleH };
-    const rad = ((vp.rotation ?? 0) * Math.PI) / 180;
-    const c = Math.abs(Math.cos(rad));
-    const s = Math.abs(Math.sin(rad));
-    const hw = (area.width * c + area.height * s) / 2;
-    const hh = (area.width * s + area.height * c) / 2;
-    const cx = area.x + area.width / 2;
-    const cy = area.y + area.height / 2;
-    const proj = bboxToFrameRect(vector.extent, { x: cx - hw, y: cy - hh, width: hw * 2, height: hh * 2 });
-    const render = buildVectorMapRenderData(vector, proj, vp.layers);
-    const badges = viewportActivePois(pois, vp).filter(
-      (p) => p.lng >= vector.extent[0] && p.lng <= vector.extent[2] && p.lat >= vector.extent[1] && p.lat <= vector.extent[3]
-    );
-    clipToMapBody(doc, area.x, area.y, area.width, area.height, radius);
-    withRotation(doc, vp.rotation, cx, cy, () => {
-      drawVectorMapPdf(doc, render, proj);
-      drawPoiBadgesPdf(doc, proj, badges, page.colorMode, page.spotColor, vp.spiderify !== false);
-    });
-    doc.restoreGraphicsState();
-  } else if (img) {
-    clipToMapBody(doc, bx, by + titleH, bw, bh - titleH, radius);
-    doc.addImage(img, 'PNG', bx, by + titleH, bw, bh - titleH);
+  // Map content: the 300-DPI MapLibre render, clipped to the frame body. The
+  // render uses the exact layout-tile setup (EDITOR_LABEL_SCALE), so the print
+  // matches the on-screen layout WYSIWYG. POI badges are baked into the raster.
+  if (img) {
+    clipToMapBody(doc, bx + body.x, by + body.y, body.w, body.h, innerRadius);
+    doc.addImage(img, 'PNG', bx + body.x, by + body.y, body.w, body.h);
     doc.restoreGraphicsState();
   }
 
   // Vector grid + cartographic border, rotated to overlay the bearing-rotated raster
   if (vp.bbox && (vp.showGrid || vp.showInsets)) {
-    const area = { x: bx, y: by + titleH, width: bw, height: bh - titleH };
-    clipToMapBody(doc, area.x, area.y, area.width, area.height, radius);
+    const area = { x: bx + body.x, y: by + body.y, width: body.w, height: body.h };
+    clipToMapBody(doc, area.x, area.y, area.width, area.height, innerRadius);
     withRotation(doc, vp.rotation, area.x + area.width / 2, area.y + area.height / 2, () => {
       if (vp.showGrid) drawGridPdf(doc, vp, area);
       drawInsetsPdf(doc, page, vp, area);
@@ -732,7 +754,7 @@ function drawViewportPdf(doc: jsPDF, page: PrintLayout, vp: MapViewport, pois: P
   doc.roundedRect(bx, by, bw, bh, radius, radius, 'S');
 }
 
-function drawPage(doc: jsPDF, page: PrintLayout, pois: POI[], images: Record<string, string>, vectors: Record<string, VectorMapData>) {
+function drawPage(doc: jsPDF, page: PrintLayout, pois: POI[], images: Record<string, string>) {
   const [pw, ph] = pageSizeMm(page);
 
   const [paperR, paperG, paperB] = hexToRgb(page.paperColor || '#ffffff');
@@ -750,7 +772,7 @@ function drawPage(doc: jsPDF, page: PrintLayout, pois: POI[], images: Record<str
 
   // Draw each map frame
   for (const vp of page.viewports) {
-    drawViewportPdf(doc, page, vp, pois, images[`${page.id}:${vp.id}`], vectors[`${page.id}:${vp.id}`]);
+    drawViewportPdf(doc, page, vp, images[`${page.id}:${vp.id}`]);
   }
 
   for (const config of page.indexLists) {
@@ -762,9 +784,8 @@ function drawPage(doc: jsPDF, page: PrintLayout, pois: POI[], images: Record<str
   }
 }
 
-export async function exportLayout(pages: PrintPage[], pois: POI[], exportMode: ExportRenderMode = 'vector'): Promise<ExportResult> {
+export async function exportLayout(pages: PrintPage[], pois: POI[]): Promise<ExportResult> {
   const images: Record<string, string> = {};
-  const vectors: Record<string, VectorMapData> = {};
 
   const tasks: Array<{ page: PrintPage; vp: MapViewport }> = [];
   for (const page of pages) {
@@ -779,39 +800,13 @@ export async function exportLayout(pages: PrintPage[], pois: POI[], exportMode: 
   await Promise.all(
     tasks.map(async ({ page, vp }) => {
       const key = `${page.id}:${vp.id}`;
-      const colorMode = colorModes.get(page.id);
+      const colorMode = colorModes.get(page.id) ?? 'spot';
       const spotColor = spotColors.get(page.id) ?? '#e0563d';
-      const itemSpacing = page.itemSpacing ?? 0;
-      const areaMm = mapAreaSize(vp, itemSpacing);
-      if (exportMode === 'raster') {
-        try {
-          images[key] = await renderViewportImage(vp, pois, colorMode, spotColor, itemSpacing);
-        } catch (e) {
-          console.warn(`Raster export failed for "${vp.title}", falling back to vector.`, e);
-          try {
-            const data = await fetchViewportMap(vp, areaMm);
-            vectors[key] = data;
-            const thumbPois = viewportActivePois(pois, vp).filter(
-              (p) => p.lng >= data.extent[0] && p.lng <= data.extent[2] && p.lat >= data.extent[1] && p.lat <= data.extent[3]
-            );
-            images[key] = renderMapThumbnail(data, areaMm, thumbPois, vp.layers, colorMode, spotColor, vp.spiderify !== false);
-          } catch (e2) {
-            console.warn(`Vector fallback failed for "${vp.title}".`, e2);
-            throw e2;
-          }
-        }
-        return;
-      }
       try {
-        const data = await fetchViewportMap(vp, areaMm);
-        vectors[key] = data;
-        const thumbPois = viewportActivePois(pois, vp).filter(
-          (p) => p.lng >= data.extent[0] && p.lng <= data.extent[2] && p.lat >= data.extent[1] && p.lat <= data.extent[3]
-        );
-        images[key] = renderMapThumbnail(data, areaMm, thumbPois, vp.layers, colorMode, spotColor, vp.spiderify !== false);
+        images[key] = await renderViewportImage(vp, pois, colorMode, spotColor, page.itemSpacing ?? 0);
       } catch (e) {
-        console.warn(`Vector export failed for "${vp.title}", falling back to raster.`, e);
-        images[key] = await renderViewportImage(vp, pois, colorMode, spotColor, itemSpacing);
+        console.warn(`Map render failed for "${vp.title}" — the frame is omitted from the PDF.`, e);
+        throw e;
       }
     })
   );
@@ -826,7 +821,7 @@ export async function exportLayout(pages: PrintPage[], pois: POI[], exportMode: 
       const orient = w >= h ? 'landscape' : 'portrait';
       doc.addPage([w, h], orient);
     }
-    drawPage(doc, page, pois, images, vectors);
+    drawPage(doc, page, pois, images);
   });
 
   const pdfDataUrl = doc.output('datauristring');

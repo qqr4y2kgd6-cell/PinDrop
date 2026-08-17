@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Kart Eksporter",
-  description: "Layout and export printable map sheets with indexes, grids and title blocks.",
+  title: "PinDrop",
+  description: "Drop pins, design map sheets, and export to print.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

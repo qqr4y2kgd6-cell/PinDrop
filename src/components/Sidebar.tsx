@@ -273,7 +273,7 @@ export function Sidebar() {
   return (
     <div className="w-80 min-h-0 flex flex-col border-r border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900">
       <div className="p-4 border-b border-zinc-200 dark:border-zinc-800">
-        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">POI Manager</h2>
+        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">PinDrop</h2>
         <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">{pois.filter(p => p.active).length} / {pois.length} active</p>
       </div>
 

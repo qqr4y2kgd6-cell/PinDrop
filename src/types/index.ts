@@ -128,6 +128,35 @@ export interface MapLayerStyle {
   parkColor?: string;
   parkOpacity?: number;
   landColor?: string;
+  /** Place-name labels (settlements, admin regions, islands, water, roads). */
+  placeNames?: PlaceNamesConfig;
+}
+
+export interface PlaceNameTierStyle {
+  show?: boolean;
+  color?: string;
+  sizeMm?: number;
+  bold?: boolean;
+  italic?: boolean;
+  uppercase?: boolean;
+  haloColor?: string;
+  haloWidthMm?: number;
+}
+
+export type PlaceNameLang = 'local' | 'english';
+
+export interface PlaceNamesConfig {
+  show?: boolean;
+  /** 'local' = native script (name); 'english' = name:en when available. */
+  lang?: PlaceNameLang;
+  country?: PlaceNameTierStyle;
+  city?: PlaceNameTierStyle;
+  town?: PlaceNameTierStyle;
+  village?: PlaceNameTierStyle;
+  suburb?: PlaceNameTierStyle;
+  island?: PlaceNameTierStyle;
+  water?: PlaceNameTierStyle;
+  road?: PlaceNameTierStyle;
 }
 
 export interface Rect {

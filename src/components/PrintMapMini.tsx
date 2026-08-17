@@ -5,7 +5,8 @@ import { Map } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { MapViewport, ColorMode } from '@/types';
 import { useMap } from '@/context/MapContext';
-import { createPrintStyle, addPoiLayer, clampBbox, applyLayerStyleOverrides, viewportActivePois } from '@/lib/mapStyle';
+import { applyLayerStyleOverrides, EDITOR_LABEL_SCALE } from '@/lib/mapStyle';
+import { createViewportMap, addViewportPois, applyViewportStyle, fitViewportBbox } from '@/lib/viewportMap';
 import { ensureMapWorker } from '@/lib/maplibreWorker';
 
 ensureMapWorker();
@@ -39,45 +40,23 @@ export function PrintMapMini({ viewport, className, onLoad, onUpdate, spotColor:
   const colorMode = colorModeProp ?? layout.colorMode ?? 'spot';
   const spotColor = spotColorProp ?? layout.spotColor;
 
-  const fitToBbox = useCallback((map: Map, bbox?: MapViewport['bbox']) => {
-    if (!bbox) return;
-    const b = clampBbox(bbox);
-    const c = map.getContainer() as HTMLDivElement;
-    if (c && (c.clientWidth <= 0 || c.clientHeight <= 0)) return;
-    try {
-      map.fitBounds(
-        [
-          [b[0], b[1]],
-          [b[2], b[3]],
-        ],
-        { padding: 0, duration: 0, bearing: map.getBearing() }
-      );
-    } catch (err) {
-      console.warn('fitToBbox failed', err);
-    }
+  const fitToBbox = useCallback((map: Map) => {
+    fitViewportBbox(map, viewportRef.current);
   }, []);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
-    const map = new Map({
-      container: containerRef.current,
-      style: createPrintStyle(),
-      center: viewport.center,
-      zoom: viewport.zoom,
-      bearing: viewport.rotation ?? 0,
-      attributionControl: false,
+    const map = createViewportMap(containerRef.current, {
+      viewport,
+      labelScale: EDITOR_LABEL_SCALE,
       interactive: false,
-      canvasContextAttributes: { preserveDrawingBuffer: true },
     });
 
     mapRef.current = map;
 
     const onStyleLoad = () => {
-      addPoiLayer(map, viewportActivePois(pois, viewport), colorMode, spotColor, viewport.spiderify !== false);
-      if (viewport.bbox) {
-        fitToBbox(map, viewport.bbox);
-      }
+      applyViewportStyle(map, { viewport, pois, colorMode, spotColor, labelScale: EDITOR_LABEL_SCALE });
       if (onLoad) onLoad(map);
     };
 
@@ -111,7 +90,7 @@ export function PrintMapMini({ viewport, className, onLoad, onUpdate, spotColor:
     const ro = new ResizeObserver(() => {
       if (mapRef.current) {
         mapRef.current.resize();
-        if (viewport.bbox) fitToBbox(mapRef.current, viewport.bbox);
+        fitToBbox(mapRef.current);
       }
     });
     if (containerRef.current) ro.observe(containerRef.current);
@@ -129,7 +108,7 @@ export function PrintMapMini({ viewport, className, onLoad, onUpdate, spotColor:
     const map = mapRef.current;
     if (!map || !viewport) return;
     if (viewport.bbox) {
-      fitToBbox(map, viewport.bbox);
+      fitToBbox(map);
       return;
     }
     const c = map.getCenter();
@@ -146,7 +125,7 @@ export function PrintMapMini({ viewport, className, onLoad, onUpdate, spotColor:
     const target = viewport.rotation ?? 0;
     if (Math.abs(map.getBearing() - target) > 0.001) {
       map.setBearing(target);
-      if (viewport.bbox) fitToBbox(map, viewport.bbox);
+      fitToBbox(map);
     }
   }, [viewport.rotation, viewport.bbox, fitToBbox]);
 
@@ -154,11 +133,11 @@ export function PrintMapMini({ viewport, className, onLoad, onUpdate, spotColor:
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    const vpPois = viewportActivePois(pois, viewport);
+    const update = () => addViewportPois(map, { viewport, pois, colorMode, spotColor });
     if (map.isStyleLoaded()) {
-      addPoiLayer(map, vpPois, colorMode, spotColor, viewport.spiderify !== false);
+      update();
     } else {
-      map.once('style.load', () => addPoiLayer(map, vpPois, colorMode, spotColor, viewport.spiderify !== false));
+      map.once('style.load', update);
     }
   }, [pois, colorMode, spotColor, viewport.visiblePoiIds, viewport.spiderify]);
 
@@ -168,7 +147,7 @@ export function PrintMapMini({ viewport, className, onLoad, onUpdate, spotColor:
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    const apply = () => applyLayerStyleOverrides(map, viewport.layers);
+    const apply = () => applyLayerStyleOverrides(map, viewport.layers, EDITOR_LABEL_SCALE);
     if (map.isStyleLoaded()) {
       apply();
     } else {

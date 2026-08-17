@@ -5,7 +5,16 @@ import type { jsPDF } from 'jspdf';
 import { GState } from 'jspdf';
 import { bboxToFrameRect, inverseMercatorY, mercatorY, type FrameProjection } from './grid';
 import { spiderify as spiderifyPois } from './spiderify';
-import { DEFAULT_LAYER_STYLE, clampBbox } from './mapStyle';
+import {
+  DEFAULT_LAYER_STYLE,
+  clampBbox,
+  PLACE_TIER_CLASSES,
+  ROAD_NAME_CLASSES,
+  WATER_NAME_CLASSES,
+  resolvePlaceNames,
+  type PlaceTier,
+} from './mapStyle';
+import type { PlaceNameTierStyle } from '@/types';
 
 const CSS_PX_PER_MM = 2;
 const TILEJSON_URL = 'https://tiles.openfreemap.org/planet';
@@ -36,6 +45,25 @@ const ROAD_SPECS = [
   { key: 'road-path', classes: ['path', 'track'], w: 0.35, o: 0.4 },
 ];
 
+/** Collision priority per tier: lower = placed first (bigger places win). */
+const PLACE_TIER_PRIORITY: Record<string, number> = {
+  country: 0,
+  city: 1,
+  town: 2,
+  village: 3,
+  suburb: 4,
+  water: 5,
+  island: 6,
+  road: 7,
+};
+
+function placeTierForClass(cls: string): PlaceTier | null {
+  for (const [tier, classes] of Object.entries(PLACE_TIER_CLASSES)) {
+    if (classes.includes(cls)) return tier as PlaceTier;
+  }
+  return null;
+}
+
 /** A single viewport's decoded vector tiles + the geographic extent they cover. */
 export interface VectorMapData {
   kind: 'vector';
@@ -59,11 +87,32 @@ export interface VectorLine {
   paths: number[][][];
 }
 
+/** A single place-name label, anchored in draw units (mm for PDF, px for thumbnails). */
+export interface VectorLabel {
+  text: string;
+  x: number;
+  y: number;
+  sizeMm: number;
+  bold: boolean;
+  italic: boolean;
+  uppercase: boolean;
+  color: string;
+  haloColor: string;
+  haloWidthMm: number;
+  /** Rotation in degrees (road names along their segment); undefined = horizontal. */
+  angle: number | undefined;
+  /** Collision priority: lower numbers are placed first (bigger places win). */
+  priority: number;
+  /** Within-tier importance (lower = more important), from the OMT `rank` field. */
+  rank: number;
+}
+
 /** Projected geometry + resolved colors/widths, ready to be drawn by any renderer. */
 export interface VectorMapRenderData {
   background: string;
   fills: VectorFill[];
   lines: VectorLine[];
+  labels: VectorLabel[];
 }
 
 function clampZoom(z: number) {
@@ -244,9 +293,50 @@ export function buildVectorMapRenderData(
   layers?: MapLayerStyle
 ): VectorMapRenderData {
   const l = { ...DEFAULT_LAYER_STYLE, ...layers };
+  const pn = resolvePlaceNames(l.placeNames);
+  const nameOf = (props: Record<string, unknown>) => {
+    const pick = pn.lang === 'english' ? (['name:en', 'name_en', 'name:latin', 'name'] as const) : (['name', 'name:en'] as const);
+    for (const k of pick) {
+      const v = props[k];
+      if (v != null && v !== '') return String(v);
+    }
+    return '';
+  };
 
   const fills = new Map<string, VectorFill>();
   const lines = new Map<string, VectorLine>();
+  const labels: VectorLabel[] = [];
+  const roadCandidates: { name: string; path: number[][] }[] = [];
+
+  const inFrame = (x: number, y: number) =>
+    x >= proj.x - 2 && x <= proj.x + proj.width + 2 && y >= proj.y - 2 && y <= proj.y + proj.height + 2;
+
+  const pushLabel = (
+    text: string,
+    x: number,
+    y: number,
+    tier: Required<PlaceNameTierStyle>,
+    priority: number,
+    rank: number,
+    angle?: number
+  ) => {
+    if (!inFrame(x, y)) return;
+    labels.push({
+      text,
+      x,
+      y,
+      sizeMm: tier.sizeMm,
+      bold: tier.bold,
+      italic: tier.italic,
+      uppercase: tier.uppercase,
+      color: tier.color,
+      haloColor: tier.haloColor,
+      haloWidthMm: tier.haloWidthMm,
+      angle,
+      priority,
+      rank,
+    });
+  };
 
   const getLine = (key: string, color: string, width: number, opacity: number, dash: number[] | null = null): VectorLine => {
     let ln = lines.get(key);
@@ -326,7 +416,22 @@ export function buildVectorMapRenderData(
           const spec = ROAD_SPECS.find((r) => r.classes.includes(cls));
           if (!spec) continue;
           const bucket = getLine(spec.key, l.roadColor, l.roadWidth * spec.w * 0.5, l.roadOpacity * spec.o);
-          pushLines(bucket, f);
+          for (const ring of f.loadGeometry()) {
+            const path = ringPoints(ring, projPt);
+            if (path.length > 1) bucket.paths.push(path);
+          }
+        }
+      } else if (layerName === 'transportation_name' && l.showRoads && pn.show && pn.road.show) {
+        for (let i = 0; i < layer.length; i++) {
+          const f = layer.feature(i);
+          const cls = typeof f.properties.class === 'string' ? f.properties.class : '';
+          if (!ROAD_NAME_CLASSES.includes(cls)) continue;
+          const name = nameOf(f.properties);
+          if (!name) continue;
+          for (const ring of f.loadGeometry()) {
+            const path = ringPoints(ring, projPt);
+            if (path.length > 1) roadCandidates.push({ name, path });
+          }
         }
       } else if (layerName === 'boundary') {
         const bucket = getLine('boundary', '#9a9a9a', 0.2, 1, [1, 1]);
@@ -335,8 +440,53 @@ export function buildVectorMapRenderData(
           const level = String(f.properties.admin_level ?? '');
           if (level === '2' || level === '3' || level === '4') pushLines(bucket, f);
         }
+      } else if (layerName === 'place' && pn.show) {
+        for (let i = 0; i < layer.length; i++) {
+          const f = layer.feature(i);
+          const tier = placeTierForClass(typeof f.properties.class === 'string' ? f.properties.class : '');
+          if (!tier) continue;
+          const t = pn[tier];
+          if (!t.show) continue;
+          const text = nameOf(f.properties);
+          if (!text) continue;
+          const geo = f.loadGeometry();
+          if (!geo.length || !geo[0].length) continue;
+          const [x, y] = projPt(geo[0][0].x, geo[0][0].y);
+          pushLabel(text, x, y, t, PLACE_TIER_PRIORITY[tier], Number(f.properties.rank ?? 99));
+        }
+      } else if (layerName === 'water_name' && pn.show && pn.water.show) {
+        for (let i = 0; i < layer.length; i++) {
+          const f = layer.feature(i);
+          const cls = String(f.properties.class ?? '');
+          if (!WATER_NAME_CLASSES.includes(cls)) continue;
+          const text = nameOf(f.properties);
+          if (!text) continue;
+          const geo = f.loadGeometry();
+          if (!geo.length || !geo[0].length) continue;
+          const [x, y] = projPt(geo[0][0].x, geo[0][0].y);
+          pushLabel(text, x, y, pn.water, PLACE_TIER_PRIORITY.water, Number(f.properties.rank ?? 99));
+        }
       }
     }
+  }
+
+  for (const { name, path } of roadCandidates) {
+    let bestLen = -1;
+    let bestMid: [number, number] = [0, 0];
+    let bestAngle = 0;
+    for (let s = 0; s < path.length - 1; s++) {
+      const [x1, y1] = path[s];
+      const [x2, y2] = path[s + 1];
+      const len = Math.hypot(x2 - x1, y2 - y1);
+      if (len > bestLen) {
+        bestLen = len;
+        bestMid = [(x1 + x2) / 2, (y1 + y2) / 2];
+        bestAngle = (Math.atan2(y2 - y1, x2 - x1) * 180) / Math.PI;
+      }
+    }
+    const approxW = name.length * pn.road.sizeMm * 0.62;
+    if (bestLen < approxW * 1.1) continue;
+    pushLabel(name, bestMid[0], bestMid[1], pn.road, PLACE_TIER_PRIORITY.road, 0, bestAngle);
   }
 
   return {
@@ -345,7 +495,87 @@ export function buildVectorMapRenderData(
     lines: ['waterway', 'building-outline', 'road-major', 'road-primary', 'road-secondary', 'road-minor', 'road-path', 'boundary']
       .map((k) => lines.get(k))
       .filter((ln): ln is VectorLine => !!ln),
+    labels,
   };
+}
+
+export interface LabelBox {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+export interface LabelPlacement {
+  label: VectorLabel;
+  box: LabelBox;
+}
+
+function labelBox(label: VectorLabel, w: number, h: number, pad: number): LabelBox {
+  if (label.angle) {
+    const rad = (label.angle * Math.PI) / 180;
+    const ca = Math.abs(Math.cos(rad));
+    const sa = Math.abs(Math.sin(rad));
+    const rw = (w + 2 * pad) * ca + (h + 2 * pad) * sa;
+    const rh = (w + 2 * pad) * sa + (h + 2 * pad) * ca;
+    return { x: label.x - rw / 2, y: label.y - rh / 2, w: rw, h: rh };
+  }
+  return { x: label.x - w / 2 - pad, y: label.y - h / 2 - pad, w: w + 2 * pad, h: h + 2 * pad };
+}
+
+function boxesOverlap(a: LabelBox, b: LabelBox) {
+  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
+/**
+ * Greedy label placement with collision avoidance, shared by the PDF and the
+ * thumbnail renderers. `measure` returns the drawn text width in the same unit
+ * as the label anchors (mm or px); `unitScale` converts mm sizes to that unit.
+ * Returns the placed labels, most important first.
+ */
+export function layoutLabels(labels: VectorLabel[], measure: (label: VectorLabel) => number, unitScale: number, padMm = 1): LabelPlacement[] {
+  const sorted = [...labels].sort((a, b) => a.priority - b.priority || a.rank - b.rank);
+  const placed: LabelPlacement[] = [];
+  const pad = padMm * unitScale;
+  outer: for (const label of sorted) {
+    const w = measure(label);
+    const h = label.sizeMm * unitScale * 1.3;
+    const box = labelBox(label, w, h, pad);
+    for (const p of placed) {
+      if (boxesOverlap(box, p.box)) continue outer;
+    }
+    placed.push({ label, box });
+  }
+  return placed;
+}
+
+function drawLabelsPdf(doc: jsPDF, labels: VectorLabel[]) {
+  const placed = layoutLabels(
+    labels,
+    (l) => {
+      doc.setFont('Helvetica', l.bold ? 'bold' : l.italic ? 'italic' : 'normal');
+      doc.setFontSize(l.sizeMm * MM_TO_PT);
+      return doc.getTextWidth(l.uppercase ? l.text.toUpperCase() : l.text);
+    },
+    1
+  );
+  for (const { label } of placed) {
+    const text = label.uppercase ? label.text.toUpperCase() : label.text;
+    const style = label.bold ? 'bold' : label.italic ? 'italic' : 'normal';
+    const opts = { align: 'center' as const, baseline: 'middle' as const, angle: label.angle ?? 0 };
+    doc.setFont('Helvetica', style);
+    doc.setFontSize(label.sizeMm * MM_TO_PT);
+    if (label.haloWidthMm > 0) {
+      const [hr, hg, hb] = hexToRgb(label.haloColor);
+      doc.setTextColor(hr, hg, hb);
+      doc.setDrawColor(hr, hg, hb);
+      doc.setLineWidth(label.haloWidthMm * 2);
+      doc.text(text, label.x, label.y, { ...opts, renderingMode: 'fillThenStroke' });
+    }
+    const [r, g, b] = hexToRgb(label.color);
+    doc.setTextColor(r, g, b);
+    doc.text(text, label.x, label.y, opts);
+  }
 }
 
 /** Draws the vector map geometry into a jsPDF document (mm units). */
@@ -391,6 +621,8 @@ export function drawVectorMapPdf(doc: jsPDF, render: VectorMapRenderData, area?:
     if (line.dash) doc.setLineDashPattern([], 0);
   }
   doc.setGState(new GState({ opacity: 1 }));
+
+  if (render.labels.length) drawLabelsPdf(doc, render.labels);
 }
 
 /** Numbered POI badge circles + white index numbers, matching `addPoiLayer`. */
@@ -485,6 +717,32 @@ export function renderMapThumbnail(
     ctx.setLineDash([]);
   }
   ctx.globalAlpha = 1;
+
+  if (render.labels.length) {
+    const placed = layoutLabels(
+      render.labels,
+      (l) => {
+        const text = l.uppercase ? l.text.toUpperCase() : l.text;
+        ctx.font = `${l.bold ? 'bold ' : ''}${l.italic ? 'italic ' : ''}${Math.max(1, l.sizeMm * scale)}px sans-serif`;
+        return ctx.measureText(text).width;
+      },
+      scale
+    );
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.lineJoin = 'round';
+    for (const { label } of placed) {
+      const text = label.uppercase ? label.text.toUpperCase() : label.text;
+      ctx.font = `${label.bold ? 'bold ' : ''}${label.italic ? 'italic ' : ''}${Math.max(1, label.sizeMm * scale)}px sans-serif`;
+      if (label.haloWidthMm > 0) {
+        ctx.lineWidth = label.haloWidthMm * 2 * scale;
+        ctx.strokeStyle = label.haloColor;
+        ctx.strokeText(text, label.x, label.y);
+      }
+      ctx.fillStyle = label.color;
+      ctx.fillText(text, label.x, label.y);
+    }
+  }
 
   const colors = badgeColors(colorMode, spotColor);
   const pts = pois.map((p) => ({ x: proj.lngToX(p.lng), y: proj.latToY(p.lat) }));

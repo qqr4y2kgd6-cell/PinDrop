@@ -3,13 +3,13 @@
 import { useEffect, useRef, useCallback, useState, useMemo } from 'react';
 import { Map, LngLatBounds } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { MapViewport, ColorMode, MapLayerStyle } from '@/types';
+import { MapViewport, ColorMode, MapLayerStyle, PlaceNameTierStyle, PlaceNamesConfig, PlaceNameLang } from '@/types';
 import { useMap } from '@/context/MapContext';
-import { createPrintStyle, addPoiLayer, clampBbox, applyLayerStyleOverrides, DEFAULT_LAYER_STYLE, viewportActivePois, insetViewports } from '@/lib/mapStyle';
+import { createPrintStyle, addPoiLayer, clampBbox, applyLayerStyleOverrides, DEFAULT_LAYER_STYLE, EDITOR_LABEL_SCALE, viewportActivePois, insetViewports, resolvePlaceNames, type PlaceNameTierKey } from '@/lib/mapStyle';
 import { TITLE_BAR_MM } from '@/lib/units';
 import { GridOverlay } from './GridOverlay';
 import { Button } from '@/components/ui/button';
-import { Target, Grid, ZoomIn, ZoomOut, Road, Building, Waves, TreePine } from 'lucide-react';
+import { Target, Grid, ZoomIn, ZoomOut, Road, Building, Waves, TreePine, MapPin, Landmark, Building2, Home, Map as MapIcon, Anchor, ChevronDown, ChevronRight, type LucideIcon } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -23,6 +23,103 @@ ensureMapWorker();
 interface PrintMapProps {
   viewport: MapViewport | undefined;
   onViewportChange: (id: string, updates: Partial<MapViewport>) => void;
+}
+
+const PLACE_NAME_SIZES = [1.2, 1.5, 1.8, 2, 2.2, 2.5, 2.8, 3, 3.5, 4];
+const PLACE_NAME_HALOS = [0, 0.2, 0.3, 0.5, 0.8];
+
+const PLACE_TIER_ROWS: { key: PlaceNameTierKey; icon: LucideIcon; label: string; allowItalic?: boolean; allowUppercase?: boolean }[] = [
+  { key: 'country', icon: Landmark, label: 'Country / Region', allowUppercase: true },
+  { key: 'city', icon: Building2, label: 'Cities' },
+  { key: 'town', icon: Home, label: 'Towns' },
+  { key: 'village', icon: MapPin, label: 'Villages / Hamlets' },
+  { key: 'suburb', icon: MapIcon, label: 'Suburbs / Quarters' },
+  { key: 'island', icon: Anchor, label: 'Islands', allowItalic: true },
+  { key: 'water', icon: Waves, label: 'Water (seas, lakes, rivers)', allowItalic: true },
+  { key: 'road', icon: Road, label: 'Road names' },
+];
+
+interface PlaceTierRowProps {
+  icon: LucideIcon;
+  label: string;
+  style: Required<PlaceNameTierStyle>;
+  allowItalic?: boolean;
+  allowUppercase?: boolean;
+  onChange: (changes: Partial<PlaceNameTierStyle>) => void;
+}
+
+function PlaceTierRow({ icon: Icon, label, style, allowItalic, allowUppercase, onChange }: PlaceTierRowProps) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center justify-between gap-1">
+        <Label className="flex items-center gap-1.5 cursor-pointer">
+          <Switch checked={style.show} onCheckedChange={(c) => onChange({ show: c })} />
+          <Icon className="h-3.5 w-3.5" />
+          <span>{label}</span>
+        </Label>
+        <div className="flex items-center gap-1">
+          <Select value={String(style.sizeMm)} onValueChange={(v) => v && onChange({ sizeMm: parseFloat(v) })}>
+            <SelectTrigger className="text-xs h-6 w-16 px-2" title="Size">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PLACE_NAME_SIZES.map((s) => (
+                <SelectItem key={s} value={String(s)}>
+                  {s.toFixed(1)} mm
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            variant="ghost"
+            size="sm"
+            className={`h-6 w-6 p-0 text-xs font-bold ${style.bold ? 'bg-zinc-200 dark:bg-zinc-700' : ''}`}
+            onClick={() => onChange({ bold: !style.bold })}
+            title="Bold"
+          >
+            B
+          </Button>
+          <ColorPicker color={style.color} onChange={(c) => onChange({ color: c })} />
+          <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setOpen(!open)} title="More options">
+            {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+          </Button>
+        </div>
+      </div>
+      {open && (
+        <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 pl-5">
+          <div className="flex flex-col gap-1">
+            <Label className="text-xs text-zinc-500">Halo</Label>
+            <div className="flex items-center gap-1.5">
+              <ColorPicker color={style.haloColor} onChange={(c) => onChange({ haloColor: c })} />
+              <Select value={String(style.haloWidthMm)} onValueChange={(v) => v && onChange({ haloWidthMm: parseFloat(v) })}>
+                <SelectTrigger className="text-xs h-7 w-16 px-2">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PLACE_NAME_HALOS.map((w) => (
+                    <SelectItem key={w} value={String(w)}>
+                      {w === 0 ? 'None' : String(w)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          {allowItalic && (
+            <Label className="flex items-center gap-1.5 cursor-pointer">
+              <Switch checked={style.italic} onCheckedChange={(c) => onChange({ italic: c })} /> Italic
+            </Label>
+          )}
+          {allowUppercase && (
+            <Label className="flex items-center gap-1.5 cursor-pointer">
+              <Switch checked={style.uppercase} onCheckedChange={(c) => onChange({ uppercase: c })} /> Uppercase
+            </Label>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
@@ -45,6 +142,17 @@ export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
   };
   const layer = <K extends keyof Required<MapLayerStyle>>(key: K): Required<MapLayerStyle>[K] =>
     (layers[key] ?? DEFAULT_LAYER_STYLE[key]) as Required<MapLayerStyle>[K];
+
+  const placeNames = useMemo(() => resolvePlaceNames(viewport?.layers?.placeNames), [viewport?.layers?.placeNames]);
+  const updatePlaceNames = (changes: Partial<PlaceNamesConfig>) => {
+    if (!viewport) return;
+    onViewportChange(viewport.id, { layers: { ...viewport.layers, placeNames: { ...viewport.layers?.placeNames, ...changes } } });
+  };
+  const updateTier = (t: PlaceNameTierKey, changes: Partial<PlaceNameTierStyle>) => {
+    if (!viewport) return;
+    const base = viewport.layers?.placeNames ?? {};
+    onViewportChange(viewport.id, { layers: { ...viewport.layers, placeNames: { ...base, [t]: { ...base[t], ...changes } } } });
+  };
 
   const contentW = Math.max(1, (viewport?.positionOnPage.width ?? 1) - (layout.itemSpacing ?? 0));
   const contentH = Math.max(1, (viewport?.positionOnPage.height ?? 1) - (viewport?.showTitle !== false ? TITLE_BAR_MM : 0) - (layout.itemSpacing ?? 0));
@@ -157,7 +265,7 @@ export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
 
     const map = new Map({
       container: mapContainer.current,
-      style: createPrintStyle(),
+      style: createPrintStyle(EDITOR_LABEL_SCALE),
       center: viewport.center,
       zoom: viewport.zoom,
       attributionControl: false,
@@ -262,7 +370,7 @@ export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    const apply = () => applyLayerStyleOverrides(map, layers);
+    const apply = () => applyLayerStyleOverrides(map, layers, EDITOR_LABEL_SCALE);
     if (map.isStyleLoaded()) {
       apply();
     } else {
@@ -336,9 +444,9 @@ export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
         )}
       </div>
 
-      <div className="absolute bottom-4 right-4 flex flex-col gap-2 w-72 max-h-[calc(100%-2rem)] overflow-y-auto">
-        <Card className="shadow-lg">
-          <CardContent className="p-3 flex flex-col gap-2.5">
+      <div className="absolute top-4 bottom-4 right-4 w-72 flex flex-col">
+        <Card className="shadow-lg flex-1 flex flex-col min-h-0">
+          <CardContent className="p-3 flex flex-col gap-2.5 min-h-0 overflow-y-auto">
             <div className="flex items-center justify-between">
               <Label className="text-sm font-semibold">{viewport.title}</Label>
               <div className="flex gap-1">
@@ -486,6 +594,45 @@ export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
                 {controlRow('Water', layer('waterColor'), (c) => updateLayers({ waterColor: c }), layer('waterOpacity'), (n) => updateLayers({ waterOpacity: n }))}
                 {controlRow('Parks', layer('parkColor'), (c) => updateLayers({ parkColor: c }), layer('parkOpacity'), (n) => updateLayers({ parkOpacity: n }))}
                 {controlRow('Land', layer('landColor'), (c) => updateLayers({ landColor: c }), 1, () => {}, ['1'])}
+              </div>
+
+              <Separator />
+
+              <div className="flex flex-col gap-2">
+                <Label className="flex items-center gap-1.5 cursor-pointer">
+                  <Switch checked={placeNames.show} onCheckedChange={(c) => updatePlaceNames({ show: c })} />
+                  <MapPin className="h-3.5 w-3.5" /> Place names
+                </Label>
+                {placeNames.show && (
+                  <div className="flex flex-col gap-1.5 pl-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium">Language</span>
+                      <Select
+                        value={placeNames.lang}
+                        onValueChange={(v) => v && updatePlaceNames({ lang: v as PlaceNameLang })}
+                      >
+                        <SelectTrigger className="text-xs h-7 w-28 px-2">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="local">Local names</SelectItem>
+                          <SelectItem value="english">English names</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {PLACE_TIER_ROWS.map(({ key, icon, label, allowItalic, allowUppercase }) => (
+                      <PlaceTierRow
+                        key={key}
+                        icon={icon}
+                        label={label}
+                        allowItalic={allowItalic}
+                        allowUppercase={allowUppercase}
+                        style={placeNames[key]}
+                        onChange={(c) => updateTier(key, c)}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
           </CardContent>
         </Card>

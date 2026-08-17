@@ -66,10 +66,10 @@ export function IndexListBody({
     >
       {columnsData.map((col, ci) => (
         <div key={ci} className="min-w-0">
-          {col.map(({ category, items, continued }) => {
+          {col.map(({ category, items, continued }, gi) => {
             const Icon = categoryIcon(category);
             return (
-              <div key={category} className="" style={{ marginBottom: `${resolved.lineHeight}px` }}>
+              <div key={`${ci}-${gi}`} className="" style={{ marginBottom: `${resolved.lineHeight}px` }}>
                 {category && (
                   <div
                     className="flex items-center gap-1 uppercase tracking-widest"

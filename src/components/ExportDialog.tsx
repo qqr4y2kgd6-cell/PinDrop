@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { PrintPage, POI } from '@/types';
-import { exportLayout, pageSizeMm, type ExportRenderMode } from '@/lib/exportPdf';
+import { exportLayout, pageSizeMm } from '@/lib/exportPdf';
 import { IndexListBody } from './IndexListFrame';
 import { TitleBlockFrame } from './TitleBlockFrame';
 import { GridOverlay } from './GridOverlay';
@@ -63,7 +63,6 @@ export function ExportDialog({ open, onOpenChange, pages, pois, autoDownload }: 
   const [images, setImages] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [exportMode, setExportMode] = useState<ExportRenderMode>('vector');
   const [zoom, setZoom] = useState<PreviewZoom>('fit');
   const scrollRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState({ w: 800, h: 600 });
@@ -91,12 +90,12 @@ export function ExportDialog({ open, onOpenChange, pages, pois, autoDownload }: 
     }
   };
 
-  const fileName = `kart-eksporter-${pages.length > 1 ? `${pages.length}-pages` : pages[0]?.pageSize.toLowerCase()}.pdf`;
+  const fileName = `pindrop-${pages.length > 1 ? `${pages.length}-pages` : pages[0]?.pageSize.toLowerCase()}.pdf`;
 
   useEffect(() => {
     if (!open) return;
     didAutoDownload.current = false;
-    exportLayout(pages, pois, exportMode)
+    exportLayout(pages, pois)
       .then((res) => {
         setPdfDataUrl(res.pdfDataUrl);
         setImages(res.images);
@@ -111,7 +110,7 @@ export function ExportDialog({ open, onOpenChange, pages, pois, autoDownload }: 
         setError('Export failed. Check your connection and try again.');
         setBusy(false);
       });
-  }, [open, pages, pois, autoDownload, fileName, exportMode]);
+  }, [open, pages, pois, autoDownload, fileName]);
 
   const totalViewports = pages.reduce((n, p) => n + p.viewports.length, 0);
   const titleHmm = 7;
@@ -128,20 +127,6 @@ export function ExportDialog({ open, onOpenChange, pages, pois, autoDownload }: 
           <div className="flex items-center justify-between pr-8">
             <DialogTitle>Print Preview{pages.length > 1 ? ` (${pages.length} pages)` : ''}</DialogTitle>
             <div className="flex items-center gap-2">
-              <div className="flex items-center gap-0.5 rounded-md bg-zinc-200 p-0.5" title="Map render mode for the PDF">
-                {(['vector', 'raster'] as const).map((mode) => (
-                  <button
-                    key={mode}
-                    type="button"
-                    onClick={() => setExportMode(mode)}
-                    className={`rounded px-2 py-0.5 text-xs font-medium capitalize transition-colors ${
-                      exportMode === mode ? 'bg-white shadow-sm text-zinc-900' : 'text-zinc-600 hover:text-zinc-900'
-                    }`}
-                  >
-                    {mode}
-                  </button>
-                ))}
-              </div>
               <div className="flex items-center gap-0.5 rounded-md bg-zinc-200 p-0.5" title="Preview zoom">
                 {([{ id: 'fit', label: 'Fit' }, { id: 0.5, label: '50%' }, { id: 1, label: '100%' }] as const).map((z) => (
                   <button
@@ -170,7 +155,7 @@ export function ExportDialog({ open, onOpenChange, pages, pois, autoDownload }: 
           {busy ? (
             <div className="flex items-center gap-3 text-zinc-700 py-20">
               <Loader2 className="h-5 w-5 animate-spin" />
-              <span>Rendering {totalViewports} map frame{totalViewports > 1 ? 's' : ''} as {exportMode}…</span>
+              <span>Rendering {totalViewports} map frame{totalViewports > 1 ? 's' : ''}…</span>
             </div>
           ) : error ? (
             <p className="text-red-600 py-20">{error}</p>
@@ -195,6 +180,8 @@ export function ExportDialog({ open, onOpenChange, pages, pois, autoDownload }: 
                         const title = vp.showTitle !== false;
                         const titleH = titleHmm * PX_PER_MM;
                         const borderColor = vp.borderColor || '#000';
+                        const bPx = (vp.borderWidth ?? 1) * PX_PER_MM;
+                        const padPx = (page.itemSpacing ?? 0) * PX_PER_MM * 0.5;
                         const family = vp.titleFontFamily ?? page.titleFontFamily;
                         const fontSize = Math.max(8, (vp.titleFontSize ?? page.titleFontSize ?? 3) * PX_PER_MM);
                         const fontWeight = vp.titleFontWeight ?? page.titleFontWeight ?? 'bold';
@@ -205,57 +192,57 @@ export function ExportDialog({ open, onOpenChange, pages, pois, autoDownload }: 
                             key={`${page.id}:${vp.id}`}
                             className="absolute overflow-hidden bg-white"
                             style={{
-                              left: p.x * PX_PER_MM,
-                              top: p.y * PX_PER_MM,
-                              width: fp.w * PX_PER_MM,
-                              height: fp.h * PX_PER_MM,
-                              border: `${(vp.borderWidth ?? 1) * PX_PER_MM}px solid ${borderColor}`,
+                              left: p.x * PX_PER_MM + padPx,
+                              top: p.y * PX_PER_MM + padPx,
+                              width: (fp.w - (page.itemSpacing ?? 0)) * PX_PER_MM,
+                              height: (fp.h - (page.itemSpacing ?? 0)) * PX_PER_MM,
+                              border: `${bPx}px solid ${borderColor}`,
                               borderRadius: vp.roundedCorners ? (vp.cornerRadius ?? 4) * PX_PER_MM : 0,
                             }}
                           >
-                            {title && (
-                              <div
-                                className="flex items-center px-2 uppercase tracking-widest shrink-0"
-                                style={{
-                                  height: titleH,
-                                  backgroundColor: titleBackground
-                                    ? (vp.titleBackgroundColor || page.defaultTitleBackgroundColor || page.spotColor)
-                                    : '#fafafa',
-                                  color: titleTextColor,
-                                  borderBottom: vp.titleBackground === false ? `1px solid ${borderColor}` : 'none',
-                                  fontFamily: titleFontCss(family),
-                                  fontSize,
-                                  fontWeight,
-                                }}
-                              >
-                                <span className="truncate">{vp.title}</span>
-                              </div>
-                            )}
-                            {images[`${page.id}:${vp.id}`] && (
-                              <div
-                                className="relative"
-                                style={{
-                                  width: (fp.w - (page.itemSpacing ?? 0)) * PX_PER_MM,
-                                  height: (fp.h - titleHmm - (page.itemSpacing ?? 0)) * PX_PER_MM,
-                                  left: (page.itemSpacing ?? 0) * PX_PER_MM * 0.5,
-                                }}
-                              >
-                                <img
-                                  src={images[`${page.id}:${vp.id}`]}
-                                  alt={vp.title}
-                                  className="absolute inset-0 w-full h-full"
-                                />
-                                {vp.showGrid && vp.bbox && (
-                                  <GridOverlay
-                                    viewport={vp}
-                                    bbox={vp.bbox}
-                                    rotation={vp.rotation ?? 0}
-                                    insets={insetViewports(page.viewports, vp)
-                                      .map((v) => ({ bbox: v.bbox!, title: v.title }))}
-                                  />
+                            <div
+                              className="absolute flex flex-col"
+                              style={{ top: bPx, left: bPx, right: bPx, bottom: bPx }}
+                            >
+                              {title && (
+                                <div
+                                  className="flex items-center px-2 uppercase tracking-widest shrink-0"
+                                  style={{
+                                    height: titleH,
+                                    backgroundColor: titleBackground
+                                      ? (vp.titleBackgroundColor || page.defaultTitleBackgroundColor || page.spotColor)
+                                      : '#fafafa',
+                                    color: titleTextColor,
+                                    borderBottom: vp.titleBackground === false ? `1px solid ${borderColor}` : 'none',
+                                    fontFamily: titleFontCss(family),
+                                    fontSize,
+                                    fontWeight,
+                                  }}
+                                >
+                                  <span className="truncate">{vp.title}</span>
+                                </div>
+                              )}
+                              <div className="relative flex-1 min-h-0">
+                                {images[`${page.id}:${vp.id}`] && (
+                                  <>
+                                    <img
+                                      src={images[`${page.id}:${vp.id}`]}
+                                      alt={vp.title}
+                                      className="absolute inset-0 w-full h-full"
+                                    />
+                                    {vp.showGrid && vp.bbox && (
+                                      <GridOverlay
+                                        viewport={vp}
+                                        bbox={vp.bbox}
+                                        rotation={vp.rotation ?? 0}
+                                        insets={insetViewports(page.viewports, vp)
+                                          .map((v) => ({ bbox: v.bbox!, title: v.title }))}
+                                      />
+                                    )}
+                                  </>
                                 )}
                               </div>
-                            )}
+                            </div>
                           </div>
                         );
                       })}

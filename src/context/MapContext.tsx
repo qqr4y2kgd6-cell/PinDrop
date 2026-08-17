@@ -5,7 +5,7 @@ import { POI, PrintLayout, PrintPage, MapViewport, IndexListConfig, TitleBlockCo
 import { mockPois, initialLayout } from '@/data/mockPois';
 import { viewportBounds, clampBbox } from '@/lib/mapStyle';
 
-const STORAGE_KEY = 'kart-eksporter-state';
+const STORAGE_KEY = 'pindrop-state';
 
 interface StoredState {
   pois: POI[];
@@ -112,12 +112,8 @@ function loadFromStorage(): StoredState | null {
 }
 
 function getInitialState(): StoredState {
-  const defaults = (): StoredState => {
-    const page = normalizePage(toPage(initialLayout, 0));
-    return { pois: mockPois, pages: [page], activePageId: page.id };
-  };
-  if (typeof window === 'undefined') return defaults();
-  return loadFromStorage() ?? defaults();
+  const page = normalizePage(toPage(initialLayout, 0));
+  return { pois: mockPois, pages: [page], activePageId: page.id };
 }
 
 interface MapContextType {
@@ -173,6 +169,16 @@ export function MapProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     activePageIdRef.current = activePageId;
   }, [activePageId]);
+
+  // Hydrate from localStorage after mount (avoids SSR/client mismatch)
+  useEffect(() => {
+    const stored = loadFromStorage();
+    if (stored) {
+      setState(stored);
+      const vp = stored.pages.find((p) => p.id === stored.activePageId)?.viewports[0]?.id ?? null;
+      setActiveViewportId(vp);
+    }
+  }, []);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ pois, pages, activePageId }));
