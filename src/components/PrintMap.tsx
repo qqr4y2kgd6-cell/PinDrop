@@ -123,10 +123,18 @@ function PlaceTierRow({ icon: Icon, label, style, allowItalic, allowUppercase, o
 }
 
 export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
-  const { pois, layout, updateLayout } = useMap();
+  const { pois, layout, updateLayout, addPoi } = useMap();
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapRef = useRef<Map | null>(null);
   const viewportRef = useRef(viewport);
+  const [dropPinMode, setDropPinMode] = useState(false);
+  const dropPinModeRef = useRef(false);
+  useEffect(() => {
+    dropPinModeRef.current = dropPinMode;
+    const map = mapRef.current;
+    if (!map) return;
+    map.getCanvas().style.cursor = dropPinMode ? 'crosshair' : '';
+  }, [dropPinMode]);
   useEffect(() => {
     viewportRef.current = viewport;
   }, [viewport]);
@@ -308,6 +316,20 @@ export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
       onViewportChange(vp.id, updates);
     });
 
+    map.on('click', (e) => {
+      if (!dropPinModeRef.current) return;
+      const { lat, lng } = e.lngLat;
+      addPoi({
+        name: 'New Pin',
+        category: 'Food',
+        cityRegion: '',
+        lat,
+        lng,
+        active: true,
+        customNumber: 0,
+      });
+    });
+
     const ro = new ResizeObserver(() => {
       const m = mapRef.current;
       if (!m) return;
@@ -484,6 +506,16 @@ export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
                 </Button>
               </div>
             </div>
+
+            <Button
+              variant={dropPinMode ? 'default' : 'outline'}
+              size="sm"
+              className="w-full h-7 text-xs justify-start gap-1.5"
+              onClick={() => setDropPinMode(!dropPinMode)}
+            >
+              <MapPin className="h-3.5 w-3.5" />
+              {dropPinMode ? 'Drop Pin (Click Map)' : 'Drop Pin'}
+            </Button>
 
             {viewport.showGrid && (
               <div className="grid grid-cols-2 gap-2 text-xs">
