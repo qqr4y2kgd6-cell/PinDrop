@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useState, useCallback } from 'react';
 import { kml } from '@tmcw/togeojson';
@@ -251,7 +250,7 @@ export function Sidebar() {
       recommendedBy: newPoi.recommendedBy || undefined,
       notes: newPoi.notes || undefined,
       active: true,
-      customNumber: Math.max(...pois.map(p => p.customNumber || 0)) + 1,
+      customNumber: pois.length > 0 ? Math.max(...pois.map(p => p.customNumber || 0)) + 1 : 1,
     });
     setNewPoi({
       name: '',
@@ -274,7 +273,7 @@ export function Sidebar() {
   }, [pois, updatePoi]);
 
   return (
-    <div className="w-80 min-h-0 flex flex-col border-r border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900">
+    <div className="w-80 min-h-0 flex flex-col border-r border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 overflow-y-auto">
       <div className="p-4 border-b border-zinc-200 dark:border-zinc-800">
         <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">PinDrop</h2>
         <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">{pois.filter(p => p.active).length} / {pois.length} active</p>
@@ -362,6 +361,22 @@ export function Sidebar() {
           <Trash2 className="h-4 w-4 mr-1" />
           Clear All
         </Button>
+      </div>
+
+      <div className="p-2 space-y-1">
+        {filteredPois.map((poi) => (
+          <POIItem
+            key={poi.id}
+            poi={poi}
+            onToggle={togglePoiActive}
+            onUpdate={updatePoi}
+            onRemove={removePoi}
+            allCategories={allCategories}
+            onRemoveCategory={(oldCat: string) => {
+              setPois(pois.map(p => p.category === oldCat ? { ...p, category: 'Food' } : p));
+            }}
+          />
+        ))}
       </div>
 
       <Dialog open={addPoiOpen} onOpenChange={setAddPoiOpen}>
@@ -487,24 +502,6 @@ export function Sidebar() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      <ScrollArea className="min-h-0 flex-1">
-        <div className="p-2 space-y-1">
-          {filteredPois.map((poi) => (
-            <POIItem
-              key={poi.id}
-              poi={poi}
-              onToggle={togglePoiActive}
-              onUpdate={updatePoi}
-              onRemove={removePoi}
-              allCategories={allCategories}
-              onRemoveCategory={(oldCat: string) => {
-                setPois(pois.map(p => p.category === oldCat ? { ...p, category: 'Food' } : p));
-              }}
-            />
-          ))}
-        </div>
-      </ScrollArea>
     </div>
   );
 }
