@@ -2,7 +2,7 @@
 
 import { useMap } from '@/context/MapContext';
 import { POI } from '@/types';
-import { Search, Upload, Download, Plus, GripVertical, Trash2, MapPin, Utensils, Landmark, Building2, TreePine, Hotel } from 'lucide-react';
+import { Search, Upload, Download, Plus, GripVertical, Trash2, X, MapPin, Utensils, Landmark, Building2, TreePine, Hotel } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -166,6 +166,7 @@ export function Sidebar() {
 
   const regions = Array.from(new Set(pois.map(p => p.cityRegion))).sort();
   const categories = Array.from(new Set(pois.map(p => p.category))).sort();
+  const allCategories = Array.from(new Set([...Object.keys(categoryIcons), ...pois.map(p => p.category)])).sort();
   const recommenders = Array.from(new Set(pois.map(p => p.recommendedBy).filter(Boolean))).sort();
 
   const filteredPois = pois
@@ -204,7 +205,7 @@ export function Sidebar() {
           newPois = parseKML(content);
         }
         
-        const maxNum = Math.max(...pois.map(p => p.customNumber || 0));
+        const maxNum = pois.length > 0 ? Math.max(...pois.map(p => p.customNumber || 0)) : 0;
         newPois = newPois.map((p, i) => ({ ...p, customNumber: maxNum + i + 1 }));
         setPois([...pois, ...newPois]);
       } catch (err) {
@@ -218,7 +219,7 @@ export function Sidebar() {
     const text = e.clipboardData.getData('text');
     try {
       const newPois = parsePaste(text);
-      const maxNum = Math.max(...pois.map(p => p.customNumber || 0));
+      const maxNum = pois.length > 0 ? Math.max(...pois.map(p => p.customNumber || 0)) : 0;
       const poisWithNumbers = newPois.map((p, i) => ({ ...p, customNumber: maxNum + i + 1 }));
       setPois([...pois, ...poisWithNumbers]);
     } catch (err) {
@@ -228,6 +229,7 @@ export function Sidebar() {
 
   const [addPoiOpen, setAddPoiOpen] = useState(false);
   const [clearAllOpen, setClearAllOpen] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
   const [newPoi, setNewPoi] = useState({
     name: '',
     category: 'Food',
@@ -345,16 +347,18 @@ export function Sidebar() {
         </Select>
       </div>
 
-      <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 flex gap-2">
-        <Button variant="outline" size="sm" onClick={renumberPois} className="flex-1">
-          <GripVertical className="h-4 w-4 mr-1" />
-          Renumber
-        </Button>
-        <Button variant="outline" size="sm" className="flex-1" onClick={() => setAddPoiOpen(true)}>
-          <Plus className="h-4 w-4 mr-1" />
-          Add POI
-        </Button>
-        <Button variant="outline" size="sm" onClick={() => setClearAllOpen(true)} disabled={pois.length === 0} className="text-destructive hover:text-destructive">
+      <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 space-y-2">
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={renumberPois} className="flex-1">
+            <GripVertical className="h-4 w-4 mr-1" />
+            Renumber
+          </Button>
+          <Button variant="outline" size="sm" className="flex-1" onClick={() => setAddPoiOpen(true)}>
+            <Plus className="h-4 w-4 mr-1" />
+            Add POI
+          </Button>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => setClearAllOpen(true)} disabled={pois.length === 0} className="w-full text-destructive hover:text-destructive">
           <Trash2 className="h-4 w-4 mr-1" />
           Clear All
         </Button>
@@ -381,13 +385,39 @@ export function Sidebar() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Food">Food</SelectItem>
-                  <SelectItem value="Shrine/Temple">Shrine/Temple</SelectItem>
-                  <SelectItem value="Architecture">Architecture</SelectItem>
-                  <SelectItem value="Park">Park</SelectItem>
-                  <SelectItem value="Hotel">Hotel</SelectItem>
+                  {allCategories.map(c => (
+                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
+              <div className="flex gap-2 mt-2">
+                <Input
+                  value={newCategoryName}
+                  onChange={e => setNewCategoryName(e.target.value)}
+                  placeholder="New category name"
+                  className="text-sm"
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && newCategoryName.trim()) {
+                      setNewPoi({ ...newPoi, category: newCategoryName.trim() });
+                      setNewCategoryName('');
+                    }
+                  }}
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0"
+                  disabled={!newCategoryName.trim()}
+                  onClick={() => {
+                    if (newCategoryName.trim()) {
+                      setNewPoi({ ...newPoi, category: newCategoryName.trim() });
+                      setNewCategoryName('');
+                    }
+                  }}
+                >
+                  Add
+                </Button>
+              </div>
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">City/Region</label>
@@ -461,7 +491,17 @@ export function Sidebar() {
       <ScrollArea className="min-h-0 flex-1">
         <div className="p-2 space-y-1">
           {filteredPois.map((poi) => (
-            <POIItem key={poi.id} poi={poi} onToggle={togglePoiActive} onUpdate={updatePoi} onRemove={removePoi} />
+            <POIItem
+              key={poi.id}
+              poi={poi}
+              onToggle={togglePoiActive}
+              onUpdate={updatePoi}
+              onRemove={removePoi}
+              allCategories={allCategories}
+              onRemoveCategory={(oldCat: string) => {
+                setPois(pois.map(p => p.category === oldCat ? { ...p, category: 'Food' } : p));
+              }}
+            />
           ))}
         </div>
       </ScrollArea>
@@ -469,11 +509,19 @@ export function Sidebar() {
   );
 }
 
-function POIItem({ poi, onToggle, onUpdate, onRemove }: { poi: POI; onToggle: (id: string) => void; onUpdate: (id: string, updates: Partial<POI>) => void; onRemove: (id: string) => void }) {
+function POIItem({ poi, onToggle, onUpdate, onRemove, allCategories, onRemoveCategory }: {
+  poi: POI;
+  onToggle: (id: string) => void;
+  onUpdate: (id: string, updates: Partial<POI>) => void;
+  onRemove: (id: string) => void;
+  allCategories: string[];
+  onRemoveCategory: (category: string) => void;
+}) {
   const Icon = categoryIcons[poi.category] || MapPin;
   const isActive = poi.active;
   const [open, setOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
   const [form, setForm] = useState({
     customNumber: String(poi.customNumber ?? ''),
     name: poi.name,
@@ -577,18 +625,55 @@ function POIItem({ poi, onToggle, onUpdate, onRemove }: { poi: POI; onToggle: (i
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Category</label>
-              <Select value={form.category} onValueChange={c => setForm({ ...form, category: c ?? 'Food' })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Food">Food</SelectItem>
-                  <SelectItem value="Shrine/Temple">Shrine/Temple</SelectItem>
-                  <SelectItem value="Architecture">Architecture</SelectItem>
-                  <SelectItem value="Park">Park</SelectItem>
-                  <SelectItem value="Hotel">Hotel</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex gap-2">
+                <Select value={form.category} onValueChange={c => setForm({ ...form, category: c ?? 'Food' })}>
+                  <SelectTrigger className="flex-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {allCategories.map(c => (
+                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="shrink-0 text-destructive hover:text-destructive"
+                  title="Remove this category"
+                  onClick={() => onRemoveCategory(form.category)}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="flex gap-2 mt-2">
+                <Input
+                  value={newCategoryName}
+                  onChange={e => setNewCategoryName(e.target.value)}
+                  placeholder="New category name"
+                  className="text-sm"
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && newCategoryName.trim()) {
+                      setForm({ ...form, category: newCategoryName.trim() });
+                      setNewCategoryName('');
+                    }
+                  }}
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0"
+                  disabled={!newCategoryName.trim()}
+                  onClick={() => {
+                    if (newCategoryName.trim()) {
+                      setForm({ ...form, category: newCategoryName.trim() });
+                      setNewCategoryName('');
+                    }
+                  }}
+                >
+                  Add
+                </Button>
+              </div>
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">City/Region</label>
