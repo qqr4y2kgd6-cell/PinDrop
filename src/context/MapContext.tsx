@@ -455,16 +455,13 @@ export function MapProvider({ children }: { children: ReactNode }) {
     setActiveThemeId(themeId);
     // Apply spotColor and colorMode to the active page
     updateLayout({ spotColor: theme.spotColor, colorMode: theme.colorMode });
-    // Apply layer overrides to all viewports on the active page
-    if (theme.layers) {
-      updatePage(activePageId, {
-        viewports: layout.viewports.map((vp) => ({
-          ...vp,
-          layers: { ...vp.layers, ...theme.layers } as Partial<MapLayerStyle>,
-        })),
+    // Apply layer overrides to the active viewport only
+    if (theme.layers && activeViewportId) {
+      updateViewport(activeViewportId, {
+        layers: { ...layout.viewports.find((vp) => vp.id === activeViewportId)?.layers, ...theme.layers } as Partial<MapLayerStyle>,
       });
     }
-  }, [themes, layout.viewports, activePageId, updateLayout, updatePage]);
+  }, [themes, layout.viewports, activeViewportId, updateLayout, updateViewport]);
 
   const saveTheme = useCallback((name: string): string => {
     const id = `theme-${Date.now()}`;
