@@ -26,7 +26,7 @@ export function PoiLabelOverlay({ map, pois, style, scale = 1 }: PoiLabelOverlay
   const [positions, setPositions] = useState<Array<{ id: string; name: string; x: number; y: number }>>([]);
 
   useEffect(() => {
-    console.log('[PoiLabelOverlay] style changed:', style);
+    console.log('[PoiLabelOverlay] render style:', style);
   }, [style]);
 
   useEffect(() => {
@@ -63,6 +63,8 @@ export function PoiLabelOverlay({ map, pois, style, scale = 1 }: PoiLabelOverlay
   }, [map, pois, scale]);
 
   if (!map || positions.length === 0) return null;
+
+  console.log('[PoiLabelOverlay] render style:', style, 'positions:', positions.length);
 
   const fontSizePx = style.fontSize * MM_TO_PX * scale;
   const paddingYPx = style.padding * MM_TO_PX * scale;

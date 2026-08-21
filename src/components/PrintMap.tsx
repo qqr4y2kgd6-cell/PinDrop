@@ -165,6 +165,7 @@ export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
   const layers = useMemo(() => viewport?.layers ?? {}, [viewport?.layers]);
   const updateLayers = (changes: Partial<MapLayerStyle>) => {
     if (!viewport) return;
+    console.log('[POI] updateLayers:', changes, 'current layers:', viewport.layers);
     onViewportChange(viewport.id, { layers: { ...viewport.layers, ...changes } });
   };
   const layer = <K extends keyof Required<MapLayerStyle>>(key: K): Required<MapLayerStyle>[K] =>
@@ -1028,8 +1029,14 @@ export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
                         <input
                           type="number"
                           value={layer('poiLabelPadding')}
-                          onChange={(e) => updateLayers({ poiLabelPadding: parseFloat(e.target.value) || 0 })}
-                          onBlur={(e) => updateLayers({ poiLabelPadding: parseFloat(e.target.value) || 0 })}
+                          onChange={(e) => {
+                            console.log('[POI] padding onChange:', e.target.value, 'current:', layer('poiLabelPadding'));
+                            updateLayers({ poiLabelPadding: parseFloat(e.target.value) || 0 });
+                          }}
+                          onBlur={(e) => {
+                            console.log('[POI] padding onBlur:', e.target.value);
+                            updateLayers({ poiLabelPadding: parseFloat(e.target.value) || 0 });
+                          }}
                           min={0}
                           max={10}
                           step={0.5}
