@@ -295,7 +295,7 @@ export function createPrintStyle(labelScale = 1, glyphsUrl: string = GLYPHS_URL)
       type: 'line',
       source: 'openmaptiles',
       'source-layer': 'boundary',
-      filter: ['match', ['get', 'admin_level'], ['2', '3', '4'], true, false] as FilterSpecification,
+      filter: ['match', ['get', 'admin_level'], [2, 3, 4], true, false] as FilterSpecification,
       paint: {
         'line-color': '#9a9a9a',
         'line-width': 0.4,
@@ -636,7 +636,7 @@ export function applyEnhancedLayerStyle(map: MapLibreMap, l: Required<MapLayerSt
     const visible = l.showAdminBoundaries;
     map.setLayoutProperty('boundary', 'visibility', visible ? 'visible' : 'none');
     if (visible) {
-      map.setFilter('boundary', ['match', ['get', 'admin_level'], ['2', '4', '6', '7', '8'], true, false]);
+      map.setFilter('boundary', ['match', ['get', 'admin_level'], [2, 4, 6, 7, 8], true, false]);
     }
     map.setPaintProperty('boundary', 'line-color', l.adminBoundaryColor);
     map.setPaintProperty('boundary', 'line-width', l.adminBoundaryWidth);
