@@ -574,6 +574,9 @@ export function applyEnhancedLayerStyle(map: MapLibreMap, l: Required<MapLayerSt
           'hillshade-shadow-color': '#000000',
         },
       }, 'poi-legs');
+      if (map.getLayer('water')) {
+        map.moveLayer('hillshade', 'water');
+      }
     }
     map.setLayoutProperty('hillshade', 'visibility', 'visible');
   } else {
@@ -807,7 +810,7 @@ export const DEFAULT_LAYER_STYLE: Required<MapLayerStyle> = {
   poiLabelBgColor: '#ffffff',
   poiLabelTextColor: '#1a1a1a',
   poiLabelFontSize: 3,
-  poiLabelPadding: 0.5,
+  poiLabelPadding: 1,
   poiLabelBorderRadius: 0.3,
   poiLabelShadow: true,
   showPoiMarkers: true,
