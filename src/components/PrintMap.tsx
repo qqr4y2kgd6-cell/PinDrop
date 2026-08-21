@@ -8,7 +8,7 @@ import { useMap } from '@/context/MapContext';
 import { createPrintStyle, addPoiLayer, clampBbox, applyLayerStyleOverrides, applyEnhancedLayerStyle, viewportBounds, DEFAULT_LAYER_STYLE, EDITOR_LABEL_SCALE, viewportActivePois, insetViewports, resolvePlaceNames, type PlaceNameTierKey } from '@/lib/mapStyle';
 import { nearestCartographicZoom } from '@/lib/grid';
 import { TITLE_BAR_MM } from '@/lib/units';
-import { PLACE_NAME_FONTS, ensureGoogleFonts } from '@/lib/placeNameFonts';
+import { PLACE_NAME_FONTS, ensureGoogleFonts, CJK_IDEOGRAPH_FONT } from '@/lib/placeNameFonts';
 import { GridOverlay } from './GridOverlay';
 import { Button } from '@/components/ui/button';
 import { Target, Grid, ZoomIn, ZoomOut, Road, Building, Waves, TreePine, MapPin, Landmark, Building2, Home, Map as MapIcon, Anchor, ChevronDown, ChevronRight, Mountain, Satellite, Train, Footprints, Flag, type LucideIcon } from 'lucide-react';
@@ -308,6 +308,7 @@ export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
       center: viewport.center,
       zoom: viewport.zoom,
       attributionControl: false,
+      localIdeographFontFamily: CJK_IDEOGRAPH_FONT,
     });
 
     mapRef.current = map;

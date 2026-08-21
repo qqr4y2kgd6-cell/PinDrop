@@ -10,6 +10,7 @@ import {
   viewportActivePois,
   EDITOR_LABEL_SCALE,
 } from './mapStyle';
+import { CJK_IDEOGRAPH_FONT } from './placeNameFonts';
 
 export interface ViewportMapOptions {
   viewport: MapViewport;
@@ -33,9 +34,10 @@ export function createViewportMap(container: HTMLElement, opts: ViewportMapOptio
     style: createPrintStyle(labelScale, glyphsUrl),
     center: viewport.center,
     zoom: viewport.zoom,
-    bearing: viewport.rotation ?? 0,
-    attributionControl: false,
-    interactive,
+      bearing: viewport.rotation ?? 0,
+      attributionControl: false,
+      localIdeographFontFamily: CJK_IDEOGRAPH_FONT,
+      interactive,
     canvasContextAttributes: { preserveDrawingBuffer: true, antialias: true },
     ...(pixelRatio ? { pixelRatio } : {}),
   });

@@ -1,20 +1,21 @@
 /**
  * Available font families for place-name labels.
  *
- * The map's glyphs are served by the same-origin glyph proxy
- * (`/api/glyphs/...`, see src/app/api/glyphs) which forwards to the public
- * OpenMapTiles/OSM.us font server.  That server hosts PostScript-style names
- * (e.g. "Open Sans Regular", "Noto Sans Bold") for every font below, including
- * the Norwegian glyphs (æ, ø, å).  `glyphFontstack` produces those names; an
- * array lets the proxy fall back to "Noto Sans" if a variant is missing.
+ * The map's glyphs are served by the same-origin glyph route
+ * (`/api/glyphs/...`, see src/app/api/glyphs) which reads glyph PBFs generated
+ * at build time from the actual Google Font TTFs (scripts/build-glyphs.mjs)
+ * and falls back to the public OSM.us font server.  Every offered font covers
+ * the Latin / Nordic glyphs (æ, ø, å, …).  Japanese / Chinese / Korean are not
+ * in these Latin fonts; they are rendered locally by MapLibre via
+ * `localIdeographFontFamily` (see CJK_IDEOGRAPH_FONT) using a CJK-capable
+ * browser font loaded below.
  *
- * Google Fonts are loaded via <link> tags for the canvas/SVG vector label
- * renderer (used by the PDF exporter and DOM previews), which is independent
- * of the MapLibre glyph pipeline above.
+ * `glyphFontstack` produces the MapLibre fontstack name (e.g. "Inter Regular").
+ * Google Fonts are also loaded via <link> tags for any canvas / SVG use.
  */
 
 export interface PlaceNameFont {
-  /** Config id stored in PlaceNameTierStyle.fontFamily */
+  /** Config id stored in PlaceNameTierStyle.fontFamily + MapLibre fontstack base */
   id: string;
   /** Human-readable label shown in the UI */
   label: string;
@@ -24,25 +25,50 @@ export interface PlaceNameFont {
   css: string;
 }
 
+/** Curated place-name fonts (Latin / Nordic coverage). */
 export const PLACE_NAME_FONTS: PlaceNameFont[] = [
   // Sans-serif
-  { id: 'Noto Sans', label: 'Noto Sans', googleFamily: 'Noto+Sans:wght@400;700', css: "'Noto Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif" },
-  { id: 'Open Sans', label: 'Open Sans', googleFamily: 'Open+Sans:wght@400;700', css: "'Open Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif" },
-  { id: 'Roboto', label: 'Roboto', googleFamily: 'Roboto:wght@400;700', css: "Roboto, 'Helvetica Neue', Helvetica, Arial, sans-serif" },
-  { id: 'Metropolis', label: 'Metropolis', googleFamily: 'Metropolis:wght@400;700', css: "Metropolis, 'Helvetica Neue', Helvetica, Arial, sans-serif" },
-  { id: 'Nunito Sans', label: 'Nunito Sans', googleFamily: 'Nunito+Sans:wght@400;700', css: "'Nunito Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif" },
+  { id: 'Inter', label: 'Inter', googleFamily: 'Inter:ital,wght@0,400;0,700;1,400;1,700', css: "'Inter', system-ui, sans-serif" },
+  { id: 'Roboto', label: 'Roboto', googleFamily: 'Roboto:ital,wght@0,400;0,500;0,700;1,400;1,700', css: "'Roboto', system-ui, sans-serif" },
+  { id: 'Open Sans', label: 'Open Sans', googleFamily: 'Open+Sans:ital,wght@0,400;0,600;0,700;1,400;1,700', css: "'Open Sans', system-ui, sans-serif" },
+  { id: 'Noto Sans', label: 'Noto Sans', googleFamily: 'Noto+Sans:ital,wght@0,400;0,700;1,400;1,700', css: "'Noto Sans', system-ui, sans-serif" },
+  { id: 'Lato', label: 'Lato', googleFamily: 'Lato:ital,wght@0,400;0,700;1,400;1,700', css: "'Lato', system-ui, sans-serif" },
+  { id: 'Montserrat', label: 'Montserrat', googleFamily: 'Montserrat:ital,wght@0,400;0,600;0,700;1,400;1,700', css: "'Montserrat', system-ui, sans-serif" },
+  { id: 'Poppins', label: 'Poppins', googleFamily: 'Poppins:ital,wght@0,400;0,500;0,600;0,700;1,400;1,700', css: "'Poppins', system-ui, sans-serif" },
+  { id: 'Work Sans', label: 'Work Sans', googleFamily: 'Work+Sans:ital,wght@0,400;0,600;0,700;1,400;1,700', css: "'Work Sans', system-ui, sans-serif" },
   // Serif
-  { id: 'Noto Sans Serif', label: 'Noto Sans Serif', googleFamily: 'Noto+Sans+Serif:wght@400;700', css: "'Noto Serif', Georgia, 'Times New Roman', serif" },
+  { id: 'Noto Serif', label: 'Noto Serif', googleFamily: 'Noto+Serif:ital,wght@0,400;0,700;1,400;1,700', css: "'Noto Serif', Georgia, serif" },
+  { id: 'Merriweather', label: 'Merriweather', googleFamily: 'Merriweather:ital,wght@0,400;0,700;1,400;1,700', css: "'Merriweather', Georgia, serif" },
+  { id: 'Lora', label: 'Lora', googleFamily: 'Lora:ital,wght@0,400;0,500;0,600;0,700;1,400;1,700', css: "'Lora', Georgia, serif" },
+  { id: 'Playfair Display', label: 'Playfair Display', googleFamily: 'Playfair+Display:ital,wght@0,400;0,700;1,400;1,700', css: "'Playfair Display', Georgia, serif" },
+  { id: 'PT Serif', label: 'PT Serif', googleFamily: 'PT+Serif:ital,wght@0,400;0,700;1,400;1,700', css: "'PT Serif', Georgia, serif" },
+  { id: 'Source Serif 4', label: 'Source Serif 4', googleFamily: 'Source+Serif+4:ital,wght@0,400;0,600;0,700;1,400;1,700', css: "'Source Serif 4', Georgia, serif" },
+  { id: 'Spectral', label: 'Spectral', googleFamily: 'Spectral:ital,wght@0,400;0,600;0,700;1,400;1,700', css: "'Spectral', Georgia, serif" },
+  { id: 'EB Garamond', label: 'EB Garamond', googleFamily: 'EB+Garamond:ital,wght@0,400;0,500;0,700;1,400;1,700', css: "'EB Garamond', Georgia, serif" },
+  // Monospace
+  { id: 'Roboto Mono', label: 'Roboto Mono', googleFamily: 'Roboto+Mono:ital,wght@0,400;0,700;1,400;1,700', css: "'Roboto Mono', ui-monospace, monospace" },
+  { id: 'Space Mono', label: 'Space Mono', googleFamily: 'Space+Mono:ital,wght@0,400;0,700;1,400;1,700', css: "'Space Mono', ui-monospace, monospace" },
 ];
 
 /**
- * MapLibre text-font entries for a given font id.
- *
- * The glyphs PBF server (tiles.openstreetmap.us) expects PostScript-style
- * names: "Open Sans Regular", "Open Sans Bold", "Noto Sans Regular", etc.
- * An array is used so MapLibre can fall back to the next font if the primary
- * doesn't have a glyph for a given Unicode code-point (e.g. localised
- * characters the primary font doesn't cover).
+ * CJK fonts used by MapLibre's `localIdeographFontFamily`. They are loaded via
+ * Google Fonts (below) and render Japanese / Chinese / Korean place names
+ * locally (the Latin glyph PBFs don't contain those codepoints). The browser
+ * resolves each character against the stack in priority order.
+ */
+export const CJK_IDEOGRAPH_FONT = 'Noto Sans JP, Noto Sans SC, Noto Sans TC, Noto Sans KR';
+
+const CJK_GOOGLE_FAMILIES = [
+  'Noto+Sans+JP:wght@400;700',
+  'Noto+Sans+SC:wght@400;700',
+  'Noto+Sans+TC:wght@400;700',
+  'Noto+Sans+KR:wght@400;700',
+];
+
+/**
+ * MapLibre text-font entry for a given font id.  Returns a single fontstack
+ * name (e.g. "Inter Regular", "Inter Bold Italic"); the glyph route serves the
+ * generated PBF, falling back to the public font server if a stack is missing.
  */
 export function glyphFontstack(
   fontFamily: string | undefined,
@@ -51,10 +77,7 @@ export function glyphFontstack(
 ): string[] {
   const suffix = bold && italic ? ' Bold Italic' : bold ? ' Bold' : italic ? ' Italic' : ' Regular';
   const id = fontFamily ?? 'Noto Sans';
-  const primary = `${id}${suffix}`;
-  const fallback = `Noto Sans${suffix}`;
-  if (id === 'Noto Sans') return [primary];
-  return [primary, fallback];
+  return [`${id}${suffix}`];
 }
 
 /** CSS font-family string for a given font id. */
@@ -69,12 +92,11 @@ export function placeNameFontCss(fontFamily?: string): string {
 let fontsReady: Promise<void> | null = null;
 
 /**
- * Inject <link rel="stylesheet"> tags for every Google Font used by the app.
- * This makes fonts available for canvas rendering (used by MapLibre when a
- * glyphs PBF 404s locally or for DOM/SVG uses).
+ * Inject <link rel="stylesheet"> tags for every Google Font used by the app
+ * (place-name fonts + CJK ideograph fonts) so they are available for canvas /
+ * DOM rendering and for MapLibre's local ideograph renderer.
  *
- * Returns a promise that resolves once all fonts are loaded.  Safe to call
- * multiple times – the injection and the ready-promise are deduplicated.
+ * Returns a promise that resolves once all fonts are loaded.  Deduplicated.
  */
 export function ensureGoogleFonts(): Promise<void> {
   if (fontsReady) return fontsReady;
@@ -82,7 +104,7 @@ export function ensureGoogleFonts(): Promise<void> {
   fontsReady = (async () => {
     if (typeof document === 'undefined') return; // SSR guard
 
-    const families = PLACE_NAME_FONTS.map((f) => f.googleFamily);
+    const families = [...PLACE_NAME_FONTS.map((f) => f.googleFamily), ...CJK_GOOGLE_FAMILIES];
     const unique = [...new Set(families)];
 
     const params = unique.map((f) => `family=${f}`).join('&');
