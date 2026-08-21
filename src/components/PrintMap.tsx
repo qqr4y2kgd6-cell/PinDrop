@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Target, Grid, ZoomIn, ZoomOut, Road, Building, Waves, TreePine, MapPin, Landmark, Building2, Home, Map as MapIcon, Anchor, ChevronDown, ChevronRight, Mountain, Satellite, Train, Footprints, Flag, type LucideIcon } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -430,7 +431,7 @@ export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
     } else {
       map.once('style.load', () => addPoiLayer(map, vpPois, colorMode, spotColor, viewport.spiderify !== false, viewport.poiMarkerScale ?? 1, viewport.layers?.showPoiMarkers ?? true));
     }
-  }, [pois, colorMode, spotColor, viewport?.id, viewport?.visiblePoiIds, viewport?.spiderify, viewport?.poiMarkerScale]);
+  }, [pois, colorMode, spotColor, viewport?.id, viewport?.visiblePoiIds, viewport?.spiderify, viewport?.poiMarkerScale, viewport?.layers?.showPoiMarkers]);
 
   // Layer styling overrides
   useEffect(() => {
@@ -1011,46 +1012,39 @@ export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
                       {controlRow('Text', layer('poiLabelTextColor'), (c) => updateLayers({ poiLabelTextColor: c }), 1, () => {}, ['1'])}
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-zinc-500 dark:text-zinc-400">Font size</span>
-                        <Select value={String(layer('poiLabelFontSize'))} onValueChange={(v) => v && updateLayers({ poiLabelFontSize: parseFloat(v) })}>
-                          <SelectTrigger className="text-xs h-7 w-20 px-2">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="2">2</SelectItem>
-                            <SelectItem value="3">3</SelectItem>
-                            <SelectItem value="4">4</SelectItem>
-                            <SelectItem value="5">5</SelectItem>
-                            <SelectItem value="6">6</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <Input
+                          type="number"
+                          value={layer('poiLabelFontSize')}
+                          onChange={(e) => updateLayers({ poiLabelFontSize: parseFloat(e.target.value) || 0 })}
+                          min={1}
+                          max={20}
+                          step={0.5}
+                          className="text-xs h-7 w-20 px-2"
+                        />
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-zinc-500 dark:text-zinc-400">Padding</span>
-                        <Select value={String(layer('poiLabelPadding'))} onValueChange={(v) => v && updateLayers({ poiLabelPadding: parseFloat(v) })}>
-                          <SelectTrigger className="text-xs h-7 w-20 px-2">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="0.3">0.3</SelectItem>
-                            <SelectItem value="0.5">0.5</SelectItem>
-                            <SelectItem value="0.8">0.8</SelectItem>
-                            <SelectItem value="1">1</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <Input
+                          type="number"
+                          value={layer('poiLabelPadding')}
+                          onChange={(e) => updateLayers({ poiLabelPadding: parseFloat(e.target.value) || 0 })}
+                          min={0}
+                          max={10}
+                          step={0.1}
+                          className="text-xs h-7 w-20 px-2"
+                        />
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-zinc-500 dark:text-zinc-400">Radius</span>
-                        <Select value={String(layer('poiLabelBorderRadius'))} onValueChange={(v) => v && updateLayers({ poiLabelBorderRadius: parseFloat(v) })}>
-                          <SelectTrigger className="text-xs h-7 w-20 px-2">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="0">0</SelectItem>
-                            <SelectItem value="0.2">0.2</SelectItem>
-                            <SelectItem value="0.3">0.3</SelectItem>
-                            <SelectItem value="0.5">0.5</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <Input
+                          type="number"
+                          value={layer('poiLabelBorderRadius')}
+                          onChange={(e) => updateLayers({ poiLabelBorderRadius: parseFloat(e.target.value) || 0 })}
+                          min={0}
+                          max={10}
+                          step={0.1}
+                          className="text-xs h-7 w-20 px-2"
+                        />
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-zinc-500 dark:text-zinc-400">Shadow</span>
