@@ -589,37 +589,46 @@ export function applyEnhancedLayerStyle(map: MapLibreMap, l: Required<MapLayerSt
           cacheSize: 100,
           timeoutMs: 10000,
         });
+        console.log('[Contour] DemSource created:', !!contourDemSource);
         try {
           contourDemSource.setupMaplibre({ addProtocol });
+          console.log('[Contour] Protocol registered');
         } catch {
-          // protocol already registered
+          console.log('[Contour] Protocol already registered');
         }
       } catch (e) {
-        console.warn('Failed to initialize contour DEM source:', e);
+        console.warn('[Contour] Failed to initialize contour DEM source:', e);
       }
     }
 
     if (contourDemSource) {
       const CONTOUR_VECTOR_SOURCE = 'contour-vector';
+      const contourUrl = contourDemSource.contourProtocolUrl({
+        multiplier: 1,
+        thresholds: {
+          11: [200, 1000],
+          12: [100, 500],
+          14: [50, 200],
+          15: [20, 100],
+        },
+        contourLayer: 'contours',
+        elevationKey: 'ele',
+        levelKey: 'level',
+      });
+      console.log('[Contour] Protocol URL:', contourUrl);
+      console.log('[Contour] Source exists:', map.getSource(CONTOUR_VECTOR_SOURCE));
+      console.log('[Contour] Layer exists:', map.getLayer('contour-lines'));
       if (!map.getSource(CONTOUR_VECTOR_SOURCE)) {
         try {
           map.addSource(CONTOUR_VECTOR_SOURCE, {
             type: 'vector',
-            tiles: [contourDemSource.contourProtocolUrl({
-              multiplier: 1,
-              thresholds: {
-                11: [200, 1000],
-                12: [100, 500],
-                14: [50, 200],
-                15: [20, 100],
-              },
-              contourLayer: 'contours',
-              elevationKey: 'ele',
-              levelKey: 'level',
-            })],
+            tiles: [contourUrl],
             maxzoom: 15,
           });
-        } catch { /* source already exists */ }
+          console.log('[Contour] Vector source added');
+        } catch (e) {
+          console.warn('[Contour] Failed to add vector source:', e);
+        }
       }
       if (!map.getLayer('contour-lines')) {
         map.addLayer({
@@ -633,6 +642,7 @@ export function applyEnhancedLayerStyle(map: MapLibreMap, l: Required<MapLayerSt
             'line-opacity': 0.6,
           },
         }, 'hillshade');
+        console.log('[Contour] Layer added');
       }
       map.setLayoutProperty('contour-lines', 'visibility', 'visible');
       map.setPaintProperty('contour-lines', 'line-color', l.contourLineColor);
