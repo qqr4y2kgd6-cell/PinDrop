@@ -633,8 +633,16 @@ export function applyEnhancedLayerStyle(map: MapLibreMap, l: Required<MapLayerSt
 
   // Admin boundaries
   if (map.getLayer('boundary')) {
-    const visible = l.showAdminBoundaries;
+    const levels: string[] = [];
+    if (l.showCountryBorders) levels.push('2');
+    if (l.showStateBorders) levels.push('4');
+    if (l.showCountyBorders) levels.push('6');
+    if (l.showMunicipalityBorders) levels.push('7', '8');
+    const visible = levels.length > 0;
     map.setLayoutProperty('boundary', 'visibility', visible ? 'visible' : 'none');
+    if (visible) {
+      map.setFilter('boundary', ['match', ['get', 'admin_level'], levels, true, false]);
+    }
     map.setPaintProperty('boundary', 'line-color', l.adminBoundaryColor);
     map.setPaintProperty('boundary', 'line-width', l.adminBoundaryWidth);
   }
@@ -692,7 +700,10 @@ export const DEFAULT_LAYER_STYLE: Required<MapLayerStyle> = {
   trailWidth: 0.3,
   trailDashArray: [4, 2],
   // Admin boundaries
-  showAdminBoundaries: true,
+  showCountryBorders: true,
+  showStateBorders: true,
+  showCountyBorders: true,
+  showMunicipalityBorders: false,
   adminBoundaryColor: '#9a9a9a',
   adminBoundaryWidth: 0.4,
   showAdminLabels: false,
