@@ -10,6 +10,7 @@ import { TitleBlockFrame } from './TitleBlockFrame';
 import { GridOverlay } from './GridOverlay';
 import { resolveIndexConfig } from '@/lib/indexStyle';
 import { titleFontCss } from '@/lib/titleFonts';
+import { ensureGoogleFonts } from '@/lib/placeNameFonts';
 import { footprintDims } from '@/lib/units';
 import { insetViewports } from '@/lib/mapStyle';
 import { Loader2, Download, X } from 'lucide-react';
@@ -67,6 +68,11 @@ export function ExportDialog({ open, onOpenChange, pages, pois, autoDownload }: 
   const scrollRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState({ w: 800, h: 600 });
   const didAutoDownload = useRef(false);
+
+  useEffect(() => {
+    if (!open) return;
+    ensureGoogleFonts().catch(() => {});
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;

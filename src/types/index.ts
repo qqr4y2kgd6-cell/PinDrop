@@ -51,7 +51,7 @@ export interface MapViewport {
   gridBorderWidth?: number;
   /** Show the letter/number grid references (A, B, … / 1, 2, …) at the map edge. */
   showGridRefs?: boolean;
-  /** Grid-reference font family (id from TITLE_FONTS). Defaults to Helvetica. */
+  /** Grid-reference font family (id from LAYOUT_FONTS). Defaults to Helvetica. */
   gridRefFontFamily?: string;
   /** Grid-reference font size in mm. Defaults to 2.8. */
   gridRefFontSize?: number;
@@ -101,7 +101,7 @@ export interface MapViewport {
   borderColor?: string;
   backgroundColor?: string;
   // Per-tile title font override (falls back to the page-level title font)
-  titleFontFamily?: string; // id from TITLE_FONTS
+  titleFontFamily?: string; // id from LAYOUT_FONTS
   titleFontSize?: number; // mm
   titleFontWeight?: 'normal' | 'medium' | 'bold';
   /** Map layer toggles + colors (roads/buildings/water/parks/land). */
@@ -338,7 +338,7 @@ export interface PrintLayout {
   snapToFold?: boolean;
   defaultTitleBackgroundColor?: string;
   defaultTitleTextColor?: string;
-  titleFontFamily?: string; // id from TITLE_FONTS (e.g. "Helvetica")
+  titleFontFamily?: string; // id from LAYOUT_FONTS (e.g. "Helvetica")
   titleFontSize?: number; // mm
   titleFontWeight?: 'normal' | 'medium' | 'bold';
   colorMode?: ColorMode;
@@ -359,7 +359,7 @@ export interface PrintLayout {
   indexListTitleFontSize?: number; // mm
   indexListTitleFontWeight?: 'normal' | 'medium' | 'bold';
   // Index list (legend) body text — applied to category headers and entries
-  indexListBodyFontFamily?: string; // id from TITLE_FONTS
+  indexListBodyFontFamily?: string; // id from LAYOUT_FONTS
   indexListBodyFontSize?: number; // mm (baseline 2.8mm ≈ 8pt)
   indexListBodyFontWeight?: 'normal' | 'medium' | 'bold';
   indexListBodyTextColor?: string; // hex

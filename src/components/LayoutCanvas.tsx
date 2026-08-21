@@ -16,7 +16,8 @@ import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { CSS_PX_PER_MM } from '@/lib/units';
-import { TITLE_FONTS } from '@/lib/titleFonts';
+import { LAYOUT_FONTS } from '@/lib/titleFonts';
+import { ensureGoogleFonts } from '@/lib/placeNameFonts';
 import { cn } from '@/lib/utils';
 import { useMap } from '@/context/MapContext';
 import { resolveIndexConfig, scopePois } from '@/lib/indexStyle';
@@ -242,6 +243,10 @@ export function LayoutCanvas({
   const [showFoldLines, setShowFoldLines] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
   const [spacePressed, setSpacePressed] = useState(false);
+
+  useEffect(() => {
+    ensureGoogleFonts().catch(() => {});
+  }, []);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const paperZoomRef = useRef(1);
@@ -1277,7 +1282,7 @@ function FontSelect({ value, onChange }: { value: string; onChange: (v: string) 
       onChange={(e) => onChange(e.target.value)}
       className="h-8 w-full rounded-lg border border-input bg-background px-2 text-sm"
     >
-      {TITLE_FONTS.map((f) => (
+      {LAYOUT_FONTS.map((f) => (
         <option key={f.id} value={f.id}>{f.label}</option>
       ))}
     </select>
