@@ -810,7 +810,7 @@ export const DEFAULT_LAYER_STYLE: Required<MapLayerStyle> = {
   poiLabelBgColor: '#ffffff',
   poiLabelTextColor: '#1a1a1a',
   poiLabelFontSize: 3,
-  poiLabelPadding: 1,
+  poiLabelPadding: 2,
   poiLabelBorderRadius: 0.3,
   poiLabelShadow: true,
   showPoiMarkers: true,
