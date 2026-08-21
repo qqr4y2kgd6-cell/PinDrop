@@ -76,7 +76,7 @@ export function glyphFontstack(
   italic: boolean | undefined,
 ): string[] {
   const suffix = bold && italic ? ' Bold Italic' : bold ? ' Bold' : italic ? ' Italic' : ' Regular';
-  const id = fontFamily ?? 'Noto Sans';
+  const id = fontFamily || 'Noto Sans';
   return [`${id}${suffix}`];
 }
 
@@ -110,21 +110,20 @@ export function ensureGoogleFonts(): Promise<void> {
     const params = unique.map((f) => `family=${f}`).join('&');
     const href = `https://fonts.googleapis.com/css2?${params}&display=swap`;
 
+    let linkReady: Promise<void> = Promise.resolve();
     if (!document.querySelector(`link[href="${href}"]`)) {
       const link = document.createElement('link');
       link.rel = 'stylesheet';
       link.href = href;
       document.head.appendChild(link);
+      linkReady = new Promise((resolve) => {
+        link.addEventListener('load', () => resolve(), { once: true });
+        link.addEventListener('error', () => resolve(), { once: true });
+      });
     }
 
-    // `document.fonts.ready` resolves as soon as there are no *pending* font
-    // loads — but the CJK families above are only fetched on first use, so
-    // without an explicit load they would never be ready when MapLibre's
-    // local ideograph renderer (localIdeographFontFamily) draws Japanese /
-    // Chinese / Korean glyphs, producing tofu. Force-fetch the CJK families
-    // (all unicode-range subsets) up front so they are available before the
-    // map is created.
-    await withTimeout(preloadCjkFonts(), 8000);
+    await linkReady;
+    await withTimeout(preloadCjkFonts(), 15000);
 
     await document.fonts.ready;
   })();
