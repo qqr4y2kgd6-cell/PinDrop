@@ -723,31 +723,15 @@ export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
                   <Switch checked={layer('showTransitStops')} onCheckedChange={(c) => updateLayers({ showTransitStops: c })} />
                   <Train className="h-3.5 w-3.5" /> Transit
                 </Label>
-                 <Label className="flex items-center gap-1.5 cursor-pointer">
-                   <Switch checked={layer('showTrails')} onCheckedChange={(c) => updateLayers({ showTrails: c })} />
-                   <Footprints className="h-3.5 w-3.5" /> Trails
-                 </Label>
-                 <Label className="flex items-center gap-1.5 cursor-pointer">
-                   <Switch checked={layer('showCountryBorders')} onCheckedChange={(c) => updateLayers({ showCountryBorders: c })} />
-                   <Landmark className="h-3.5 w-3.5" /> Country borders
-                 </Label>
-                 <Label className="flex items-center gap-1.5 cursor-pointer">
-                   <Switch checked={layer('showStateBorders')} onCheckedChange={(c) => updateLayers({ showStateBorders: c })} />
-                   <MapIcon className="h-3.5 w-3.5" /> States / Prefectures
-                 </Label>
-                 <Label className="flex items-center gap-1.5 cursor-pointer">
-                   <Switch checked={layer('showCountyBorders')} onCheckedChange={(c) => updateLayers({ showCountyBorders: c })} />
-                   <MapPin className="h-3.5 w-3.5" /> Counties / Fylker
-                 </Label>
-                 <Label className="flex items-center gap-1.5 cursor-pointer">
-                   <Switch checked={layer('showMunicipalityBorders')} onCheckedChange={(c) => updateLayers({ showMunicipalityBorders: c })} />
-                   <Home className="h-3.5 w-3.5" /> Municipalities
-                 </Label>
-                 <Label className="flex items-center gap-1.5 cursor-pointer">
-                   <Switch checked={layer('showAdminLabels')} onCheckedChange={(c) => updateLayers({ showAdminLabels: c })} />
-                   <Flag className="h-3.5 w-3.5" /> Admin labels
-                 </Label>
-               </div>
+                  <Label className="flex items-center gap-1.5 cursor-pointer">
+                    <Switch checked={layer('showTrails')} onCheckedChange={(c) => updateLayers({ showTrails: c })} />
+                    <Footprints className="h-3.5 w-3.5" /> Trails
+                  </Label>
+                  <Label className="flex items-center gap-1.5 cursor-pointer">
+                    <Switch checked={layer('showAdminBoundaries')} onCheckedChange={(c) => updateLayers({ showAdminBoundaries: c })} />
+                    <Landmark className="h-3.5 w-3.5" /> Administrative borders
+                  </Label>
+                </div>
 
               <Separator />
 

@@ -169,10 +169,7 @@ export interface MapLayerStyle {
   trailWidth?: number;
   trailDashArray?: number[];
   // Administrative boundaries (enhanced)
-  showCountryBorders?: boolean;
-  showStateBorders?: boolean;
-  showCountyBorders?: boolean;
-  showMunicipalityBorders?: boolean;
+  showAdminBoundaries?: boolean;
   adminBoundaryColor?: string;
   adminBoundaryWidth?: number;
   showAdminLabels?: boolean;
