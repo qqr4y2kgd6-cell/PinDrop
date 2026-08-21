@@ -580,7 +580,7 @@ export function applyEnhancedLayerStyle(map: MapLibreMap, l: Required<MapLayerSt
   if (l.showContourLines) {
     console.log('[Contour] maplibreContour keys:', Object.keys(maplibreContour));
     console.log('[Contour] DemSource:', typeof maplibreContour.DemSource);
-    console.log('[Contour] showContourLines enabled');
+    console.log('[Contour] showContourLines enabled, map zoom:', map.getZoom());
     if (!contourDemSource) {
       try {
         const DemSource = maplibreContour.DemSource;
