@@ -641,7 +641,7 @@ export function applyEnhancedLayerStyle(map: MapLibreMap, l: Required<MapLayerSt
             'line-width': l.contourLineWidth,
             'line-opacity': 0.6,
           },
-        }, 'hillshade');
+        });
         console.log('[Contour] Layer added');
       }
       map.setLayoutProperty('contour-lines', 'visibility', 'visible');
