@@ -797,6 +797,14 @@ export const DEFAULT_LAYER_STYLE: Required<MapLayerStyle> = {
   adminBoundaryColor: '#9a9a9a',
   adminBoundaryWidth: 0.4,
   showAdminLabels: false,
+  // POI labels overlay
+  showPoiLabels: false,
+  poiLabelBgColor: '#ffffff',
+  poiLabelTextColor: '#1a1a1a',
+  poiLabelFontSize: 12,
+  poiLabelPadding: 4,
+  poiLabelBorderRadius: 4,
+  poiLabelShadow: true,
 };
 
 function setLayerVisibility(map: MapLibreMap, ids: string[], visible: boolean) {

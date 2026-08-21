@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useCallback, useState } from 'react';
+import { useEffect, useRef, useCallback, useState, useMemo } from 'react';
 import { Map } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { MapViewport, ColorMode } from '@/types';
@@ -10,6 +10,7 @@ import { CSS_PX_PER_MM } from '@/lib/units';
 import { createViewportMap, addViewportPois, applyViewportStyle, fitViewportBbox } from '@/lib/viewportMap';
 import { ensureGoogleFonts } from '@/lib/placeNameFonts';
 import { ensureMapWorker } from '@/lib/maplibreWorker';
+import { PoiLabelOverlay } from './PoiLabelOverlay';
 
 ensureMapWorker();
 
@@ -201,6 +202,8 @@ export function PrintMapMini({ viewport, className, onLoad, onUpdate, spotColor:
     }
   }, [viewport.layers]);
 
+  const layers = useMemo(() => ({ ...DEFAULT_LAYER_STYLE, ...viewport.layers }), [viewport.layers]);
+
   return (
     <div ref={outerRef} className={className} style={{ width: '100%', height: '100%', overflow: 'hidden' }}>
       <div
@@ -212,6 +215,21 @@ export function PrintMapMini({ viewport, className, onLoad, onUpdate, spotColor:
           transformOrigin: '0 0',
         }}
       />
+      {layers.showPoiLabels && mapRef.current && (
+        <PoiLabelOverlay
+          map={mapRef.current}
+          pois={pois}
+          scale={scale}
+          style={{
+            bgColor: layers.poiLabelBgColor,
+            textColor: layers.poiLabelTextColor,
+            fontSize: layers.poiLabelFontSize,
+            padding: layers.poiLabelPadding,
+            borderRadius: layers.poiLabelBorderRadius,
+            showShadow: layers.poiLabelShadow,
+          }}
+        />
+      )}
     </div>
   );
 }

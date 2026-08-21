@@ -10,6 +10,7 @@ import { nearestCartographicZoom } from '@/lib/grid';
 import { TITLE_BAR_MM } from '@/lib/units';
 import { PLACE_NAME_FONTS, ensureGoogleFonts, CJK_IDEOGRAPH_FONT } from '@/lib/placeNameFonts';
 import { GridOverlay } from './GridOverlay';
+import { PoiLabelOverlay } from './PoiLabelOverlay';
 import { Button } from '@/components/ui/button';
 import { Target, Grid, ZoomIn, ZoomOut, Road, Building, Waves, TreePine, MapPin, Landmark, Building2, Home, Map as MapIcon, Anchor, ChevronDown, ChevronRight, Mountain, Satellite, Train, Footprints, Flag, type LucideIcon } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -500,6 +501,20 @@ export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
         {boxSize && (
           <div className="relative" style={{ width: boxSize.w, height: boxSize.h }}>
             <div ref={mapContainer} className="h-full w-full" />
+            {layer('showPoiLabels') && (
+              <PoiLabelOverlay
+                map={mapRef.current}
+                pois={pois}
+                style={{
+                  bgColor: layer('poiLabelBgColor'),
+                  textColor: layer('poiLabelTextColor'),
+                  fontSize: layer('poiLabelFontSize'),
+                  padding: layer('poiLabelPadding'),
+                  borderRadius: layer('poiLabelBorderRadius'),
+                  showShadow: layer('poiLabelShadow'),
+                }}
+              />
+            )}
             {viewport.showGrid && viewport.bbox && (
               <GridOverlay
                 viewport={viewport}
@@ -977,6 +992,70 @@ export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
                             <SelectItem value="8">Extra large</SelectItem>
                           </SelectContent>
                         </Select>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* POI labels */}
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="flex items-center gap-1.5 cursor-pointer">
+                      <Switch checked={layer('showPoiLabels')} onCheckedChange={(c) => updateLayers({ showPoiLabels: c })} />
+                      <Flag className="h-3.5 w-3.5" /> POI labels
+                    </Label>
+                  </div>
+                  {layer('showPoiLabels') && (
+                    <div className="flex flex-col gap-1.5 pl-1">
+                      {controlRow('Background', layer('poiLabelBgColor'), (c) => updateLayers({ poiLabelBgColor: c }), 1, () => {}, ['1'])}
+                      {controlRow('Text', layer('poiLabelTextColor'), (c) => updateLayers({ poiLabelTextColor: c }), 1, () => {}, ['1'])}
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-zinc-500 dark:text-zinc-400">Font size</span>
+                        <Select value={String(layer('poiLabelFontSize'))} onValueChange={(v) => v && updateLayers({ poiLabelFontSize: parseFloat(v) })}>
+                          <SelectTrigger className="text-xs h-7 w-20 px-2">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="10">10</SelectItem>
+                            <SelectItem value="12">12</SelectItem>
+                            <SelectItem value="14">14</SelectItem>
+                            <SelectItem value="16">16</SelectItem>
+                            <SelectItem value="18">18</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-zinc-500 dark:text-zinc-400">Padding</span>
+                        <Select value={String(layer('poiLabelPadding'))} onValueChange={(v) => v && updateLayers({ poiLabelPadding: parseFloat(v) })}>
+                          <SelectTrigger className="text-xs h-7 w-20 px-2">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="2">2</SelectItem>
+                            <SelectItem value="4">4</SelectItem>
+                            <SelectItem value="6">6</SelectItem>
+                            <SelectItem value="8">8</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-zinc-500 dark:text-zinc-400">Radius</span>
+                        <Select value={String(layer('poiLabelBorderRadius'))} onValueChange={(v) => v && updateLayers({ poiLabelBorderRadius: parseFloat(v) })}>
+                          <SelectTrigger className="text-xs h-7 w-20 px-2">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="0">0</SelectItem>
+                            <SelectItem value="2">2</SelectItem>
+                            <SelectItem value="4">4</SelectItem>
+                            <SelectItem value="6">6</SelectItem>
+                            <SelectItem value="8">8</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-zinc-500 dark:text-zinc-400">Shadow</span>
+                        <Switch checked={layer('poiLabelShadow')} onCheckedChange={(c) => updateLayers({ poiLabelShadow: c })} />
                       </div>
                     </div>
                   )}

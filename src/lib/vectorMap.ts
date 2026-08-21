@@ -669,6 +669,60 @@ export function drawPoiBadgesPdf(doc: jsPDF, proj: FrameProjection, pois: POI[],
   }
 }
 
+export function drawPoiLabelsPdf(
+  doc: jsPDF,
+  proj: FrameProjection,
+  pois: POI[],
+  style: {
+    bgColor: string;
+    textColor: string;
+    fontSize: number;
+    padding: number;
+    borderRadius: number;
+    showShadow: boolean;
+  },
+  spiderify = true,
+) {
+  const [br, bg, bb] = hexToRgb(style.bgColor);
+  const [tr, tg, tb] = hexToRgb(style.textColor);
+  const pts = pois.map((p) => ({ x: proj.lngToX(p.lng), y: proj.latToY(p.lat) }));
+  const laid = spiderify
+    ? spiderifyPois(pts, 9, pois.map((p) => p.customNumber ?? p.id))
+    : pts.map((p) => ({ x: p.x, y: p.y, spidered: false, legFrom: undefined }));
+
+  doc.setFont('Helvetica', 'normal');
+  doc.setFontSize(style.fontSize * MM_TO_PT);
+
+  for (let i = 0; i < pois.length; i++) {
+    const p = pois[i];
+    const r = laid[i];
+    const text = p.name;
+    const textWidth = doc.getTextWidth(text) + style.padding * 2;
+    const textHeight = style.fontSize + style.padding * 2;
+    const rx = r.x - textWidth / 2;
+    const ry = r.y - textHeight - 6;
+    const rr = style.borderRadius;
+
+    doc.setFillColor(br, bg, bb);
+    if (style.showShadow) {
+      doc.setFillColor(180, 180, 180);
+      doc.roundedRect(rx + 0.5, ry + 0.5, textWidth, textHeight, rr, rr, 'F');
+      doc.setFillColor(br, bg, bb);
+    }
+    doc.roundedRect(rx, ry, textWidth, textHeight, rr, rr, 'F');
+
+    doc.setTextColor(tr, tg, tb);
+    doc.text(text, r.x, ry + textHeight - style.padding - 1, { align: 'center', baseline: 'bottom' });
+
+    if (style.borderRadius > 0) {
+      doc.setDrawColor(br, bg, bb);
+      doc.setLineWidth(0.2);
+      doc.roundedRect(rx, ry, textWidth, textHeight, rr, rr, 'S');
+    }
+  }
+}
+
+
 /**
  * Renders the same vector map to a small PNG (5 px/mm) for the export-dialog
  * thumbnail. Reuses the decoded tiles + projection, so no extra MapLibre

@@ -176,6 +176,14 @@ export interface MapLayerStyle {
   adminBoundaryColor?: string;
   adminBoundaryWidth?: number;
   showAdminLabels?: boolean;
+  // POI labels overlay
+  showPoiLabels?: boolean;
+  poiLabelBgColor?: string;
+  poiLabelTextColor?: string;
+  poiLabelFontSize?: number;
+  poiLabelPadding?: number;
+  poiLabelBorderRadius?: number;
+  poiLabelShadow?: boolean;
 }
 
 export interface PlaceNameTierStyle {

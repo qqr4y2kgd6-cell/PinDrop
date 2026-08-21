@@ -1,7 +1,7 @@
 'use client';
 
 import { jsPDF, GState } from 'jspdf';
-import { PrintLayout, PrintPage, POI, MapViewport, ColorMode, IndexListConfig, TitleBlockConfig, Rect } from '@/types';
+import { PrintLayout, PrintPage, POI, MapViewport, ColorMode, IndexListConfig, TitleBlockConfig, Rect, MapLayerStyle } from '@/types';
 import { computeGridRefs, insetViewports, EDITOR_LABEL_SCALE } from './mapStyle';
 import { createViewportMap, applyViewportStyle } from './viewportMap';
 import { ensureMapWorker } from './maplibreWorker';
@@ -11,7 +11,7 @@ import { resolveIndexConfig, buildIndexGroups, distributeGroups, scopePois } fro
 import { indexIconFor, drawIndexIcon } from './indexIcons';
 import { footprintDims, TITLE_BAR_MM } from './units';
 import { autoGridSpacing, spacingLabel, buildGridGeometry, buildBorder, bboxToFrameRect, buildBorderFrameSegments, buildGridRefLabels, buildInsetRect } from './grid';
-import { hexToRgb } from './vectorMap';
+import { hexToRgb, drawPoiLabelsPdf } from './vectorMap';
 
 ensureMapWorker();
 
@@ -691,7 +691,7 @@ function drawInsetsPdf(doc: jsPDF, page: PrintLayout, vp: MapViewport, area: { x
   }
 }
 
-function drawViewportPdf(doc: jsPDF, page: PrintLayout, vp: MapViewport, img?: string) {
+function drawViewportPdf(doc: jsPDF, page: PrintLayout, vp: MapViewport, img?: string, pois: POI[] = [], layers?: MapLayerStyle) {
   const p = vp.positionOnPage;
   const fp = footprintDims(vp.rotation, p.width, p.height);
   // itemSpacing is symmetric padding: inset the whole frame so the fold lines
@@ -768,6 +768,23 @@ function drawViewportPdf(doc: jsPDF, page: PrintLayout, vp: MapViewport, img?: s
     doc.restoreGraphicsState();
   }
 
+  // POI labels overlay (drawn on top of the map raster)
+  if (layers?.showPoiLabels && vp.bbox && pois.length > 0) {
+    const mapRect = { x: bx + body.x, y: by + body.y, width: body.w, height: body.h };
+    const proj = bboxToFrameRect(vp.bbox, mapRect);
+    const activePois = pois.filter((p) => p.active);
+    if (activePois.length > 0) {
+      drawPoiLabelsPdf(doc, proj, activePois, {
+        bgColor: layers.poiLabelBgColor ?? '#ffffff',
+        textColor: layers.poiLabelTextColor ?? '#1a1a1a',
+        fontSize: layers.poiLabelFontSize ?? 12,
+        padding: layers.poiLabelPadding ?? 4,
+        borderRadius: layers.poiLabelBorderRadius ?? 4,
+        showShadow: layers.poiLabelShadow ?? true,
+      });
+    }
+  }
+
   // Vector grid + cartographic border, rotated to overlay the bearing-rotated raster
   if (vp.bbox && (vp.showGrid || vp.showInsets)) {
     const area = { x: bx + body.x, y: by + body.y, width: body.w, height: body.h };
@@ -804,7 +821,7 @@ function drawPage(doc: jsPDF, page: PrintLayout, pois: POI[], images: Record<str
 
   // Draw each map frame
   for (const vp of page.viewports) {
-    drawViewportPdf(doc, page, vp, images[`${page.id}:${vp.id}`]);
+    drawViewportPdf(doc, page, vp, images[`${page.id}:${vp.id}`], pois, vp.layers);
   }
 
   for (const config of page.indexLists) {
