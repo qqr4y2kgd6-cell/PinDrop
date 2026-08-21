@@ -5,7 +5,7 @@ import { Map } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { MapViewport, ColorMode } from '@/types';
 import { useMap } from '@/context/MapContext';
-import { applyLayerStyleOverrides } from '@/lib/mapStyle';
+import { applyLayerStyleOverrides, applyEnhancedLayerStyle, DEFAULT_LAYER_STYLE } from '@/lib/mapStyle';
 import { CSS_PX_PER_MM } from '@/lib/units';
 import { createViewportMap, addViewportPois, applyViewportStyle, fitViewportBbox } from '@/lib/viewportMap';
 import { ensureGoogleFonts } from '@/lib/placeNameFonts';
@@ -191,6 +191,7 @@ export function PrintMapMini({ viewport, className, onLoad, onUpdate, spotColor:
       const pw = viewport.positionOnPage.width * CSS_PX_PER_MM;
       const ls = Math.max(0.5, EDITOR_APPROX_WIDTH / pw);
       applyLayerStyleOverrides(map, viewport.layers, ls);
+      applyEnhancedLayerStyle(map, { ...DEFAULT_LAYER_STYLE, ...viewport.layers });
     };
     if (map.isStyleLoaded()) {
       apply();
