@@ -117,10 +117,53 @@ export function ensureGoogleFonts(): Promise<void> {
       document.head.appendChild(link);
     }
 
+    // `document.fonts.ready` resolves as soon as there are no *pending* font
+    // loads — but the CJK families above are only fetched on first use, so
+    // without an explicit load they would never be ready when MapLibre's
+    // local ideograph renderer (localIdeographFontFamily) draws Japanese /
+    // Chinese / Korean glyphs, producing tofu. Force-fetch the CJK families
+    // (all unicode-range subsets) up front so they are available before the
+    // map is created.
+    await withTimeout(preloadCjkFonts(), 8000);
+
     await document.fonts.ready;
   })();
 
   return fontsReady;
+}
+
+/**
+ * Force the browser to fetch the CJK font families.  Loading without a `text`
+ * argument pulls every @font-face for the family (all unicode-range subsets);
+ * we also pass a few representative characters so the browser is certain to
+ * fetch the Hiragana / Katakana / Han subsets actually used on JP / CN / KR maps.
+ */
+/** Resolve after `ms`, used to cap the CJK font preload so a slow/offline
+ *  connection can never block map creation. */
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | void> {
+  return Promise.race([p, new Promise<void>((resolve) => setTimeout(resolve, ms))]);
+}
+
+async function preloadCjkFonts(): Promise<void> {
+  if (typeof document === 'undefined' || !('fonts' in document)) return;
+  const samples: Record<string, string> = {
+    'Noto Sans JP': 'あいうえおかきくけこ漢字日本',
+    'Noto Sans SC': '中文汉字中国',
+    'Noto Sans TC': '中文漢字中國',
+    'Noto Sans KR': '한글한국조선',
+  };
+  await Promise.allSettled(
+    CJK_GOOGLE_FAMILIES.map((fam) => {
+      const name = fam.split(':')[0].replace(/\+/g, ' ');
+      const text = samples[name] ?? '';
+      return Promise.all([
+        document.fonts.load(`400 16px "${name}"`),
+        document.fonts.load(`700 16px "${name}"`),
+        text ? document.fonts.load(`400 16px "${name}"`, text) : Promise.resolve([]),
+        text ? document.fonts.load(`700 16px "${name}"`, text) : Promise.resolve([]),
+      ]);
+    }),
+  );
 }
 
 /* ------------------------------------------------------------------ */
