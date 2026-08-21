@@ -739,6 +739,13 @@ export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
 
               <Separator />
 
+              {layer('showContourLines') && (
+                <div className="flex flex-col gap-1.5">
+                  {controlRow('Contour color', layer('contourLineColor'), (c) => updateLayers({ contourLineColor: c }), 0.6, () => {}, ['0.3', '0.6', '1'])}
+                  {controlRow('Index color', layer('contourIndexColor'), (c) => updateLayers({ contourIndexColor: c }), 0.9, () => {}, ['0.3', '0.6', '1'])}
+                </div>
+              )}
+
               <div className="flex flex-col gap-2">
                 <Label className="flex items-center gap-1.5 cursor-pointer">
                   <Switch checked={placeNames.show} onCheckedChange={(c) => updatePlaceNames({ show: c })} />

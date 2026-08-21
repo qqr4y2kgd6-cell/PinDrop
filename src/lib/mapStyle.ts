@@ -603,13 +603,13 @@ export function applyEnhancedLayerStyle(map: MapLibreMap, l: Required<MapLayerSt
         multiplier: 1,
         overzoom: 1,
         thresholds: {
-          0: [125, 250],
-          10: [100, 200],
-          11: [50, 250],
-          12: [25, 125],
-          13: [12, 62],
-          14: [7, 37],
-          15: [4, 20],
+          0: [62, 620],
+          10: [50, 500],
+          11: [25, 250],
+          12: [12, 120],
+          13: [6, 60],
+          14: [3, 30],
+          15: [2, 20],
         },
         contourLayer: 'contours',
         elevationKey: 'ele',
@@ -652,11 +652,33 @@ export function applyEnhancedLayerStyle(map: MapLibreMap, l: Required<MapLayerSt
       map.setLayoutProperty('contour-lines', 'visibility', 'visible');
       map.setPaintProperty('contour-lines', 'line-color', l.contourLineColor);
       map.setPaintProperty('contour-lines', 'line-width', l.contourLineWidth);
+
+      if (!map.getLayer('contour-index')) {
+        map.addLayer({
+          id: 'contour-index',
+          type: 'line',
+          source: CONTOUR_VECTOR_SOURCE,
+          'source-layer': 'contours',
+          filter: ['==', ['get', 'level'], 1] as FilterSpecification,
+          paint: {
+            'line-color': l.contourIndexColor,
+            'line-width': l.contourLineWidth,
+            'line-opacity': 0.9,
+          },
+        });
+        if (map.getLayer('water')) {
+          map.moveLayer('contour-index', 'water');
+        }
+      }
+      map.setLayoutProperty('contour-index', 'visibility', 'visible');
+      map.setPaintProperty('contour-index', 'line-color', l.contourIndexColor);
+      map.setPaintProperty('contour-index', 'line-width', l.contourLineWidth);
     }
   } else {
-    setLayerVisibility(map, ['contour-lines'], false);
+    setLayerVisibility(map, ['contour-lines', 'contour-index'], false);
     const CONTOUR_VECTOR_SOURCE = 'contour-vector';
     if (map.getLayer('contour-lines')) map.removeLayer('contour-lines');
+    if (map.getLayer('contour-index')) map.removeLayer('contour-index');
     if (map.getSource(CONTOUR_VECTOR_SOURCE)) map.removeSource(CONTOUR_VECTOR_SOURCE);
   }
 
@@ -754,6 +776,7 @@ export const DEFAULT_LAYER_STYLE: Required<MapLayerStyle> = {
   showContourLines: false,
   contourLineColor: '#8B7355',
   contourLineWidth: 0.5,
+  contourIndexColor: '#5a4a3a',
   contourLabelColor: '#000000',
   contourLabelSize: 2.0,
   // Terrain hillshade

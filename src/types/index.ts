@@ -154,6 +154,7 @@ export interface MapLayerStyle {
   showContourLines?: boolean;
   contourLineColor?: string;
   contourLineWidth?: number;
+  contourIndexColor?: string;
   contourLabelColor?: string;
   contourLabelSize?: number;
   // Terrain hillshade
