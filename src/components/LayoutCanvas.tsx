@@ -1525,6 +1525,9 @@ function ViewportProperties({ viewport, page, onUpdate }: {
             Background
           </Label>
         </div>
+        <Field label="Title bar height (mm)">
+          <Num value={viewport.titleBarHeight ?? 7} onChange={(v) => onUpdate(viewport.id, { titleBarHeight: v })} min={1} max={20} step={0.5} />
+        </Field>
         <FontGroup
           family={viewport.titleFontFamily ?? page.titleFontFamily ?? 'Helvetica'}
           size={viewport.titleFontSize ?? page.titleFontSize ?? 3}

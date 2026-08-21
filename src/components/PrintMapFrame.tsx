@@ -37,10 +37,10 @@ export function PrintMapFrame({ viewport, isActive, onSelect, onRemove, onUpdate
   const titleTextColor = viewport.titleTextColor || layout.defaultTitleTextColor || (titleBackground ? '#ffffff' : '#1a1a1a');
   const titleFontSize = Math.max(2, (viewport.titleFontSize ?? layout.titleFontSize ?? 3) * CSS_PX_PER_MM);
   const titleFontWeight = viewport.titleFontWeight ?? layout.titleFontWeight ?? 'bold';
-  // The title bar is a fixed print-height band (TITLE_BAR_MM), matching the
-  // export's frame body so a bbox fit shows exactly the same extent in the
-  // layout tile and the PDF.
-  const titleBarHeight = `${TITLE_BAR_MM * CSS_PX_PER_MM}px`;
+  // The title bar height is user-adjustable per viewport; fall back to the
+  // fixed print-height band (TITLE_BAR_MM), matching the export's frame body
+  // so a bbox fit shows exactly the same extent in the layout tile and the PDF.
+  const titleBarHeight = `${(viewport.titleBarHeight ?? TITLE_BAR_MM) * CSS_PX_PER_MM}px`;
   // Scale bar
   const showScaleBar = viewport.bbox && (viewport.showScaleBar ?? true);
   const scaleBar = showScaleBar

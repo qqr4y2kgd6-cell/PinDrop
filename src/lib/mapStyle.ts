@@ -840,12 +840,13 @@ export function viewportBounds(vp: {
   zoom: number;
   positionOnPage: { width: number; height: number };
   showTitle?: boolean;
+  titleBarHeight?: number;
   itemSpacing?: number;
   bbox?: BBox;
 }): BBox {
   if (vp.bbox) return vp.bbox;
   const [lng, lat] = vp.center;
-  const titleBar = (vp.showTitle !== false ? TITLE_BAR_MM : 0) * CSS_PX_PER_MM;
+  const titleBar = (vp.showTitle !== false ? (vp.titleBarHeight ?? TITLE_BAR_MM) : 0) * CSS_PX_PER_MM;
   const spacing = (vp.itemSpacing ?? 0) * CSS_PX_PER_MM;
   const wPx = Math.max(1, vp.positionOnPage.width * CSS_PX_PER_MM - spacing);
   const hPx = Math.max(1, vp.positionOnPage.height * CSS_PX_PER_MM - titleBar - spacing);
@@ -897,10 +898,11 @@ export function viewportGridExtent(vp: {
   bbox?: BBox;
   positionOnPage?: { width: number; height: number };
   showTitle?: boolean;
+  titleBarHeight?: number;
   itemSpacing?: number;
 }): BBox | null {
   if (!vp.bbox || !vp.positionOnPage) return null;
-  const titleBar = (vp.showTitle !== false ? TITLE_BAR_MM : 0) * CSS_PX_PER_MM;
+  const titleBar = (vp.showTitle !== false ? (vp.titleBarHeight ?? TITLE_BAR_MM) : 0) * CSS_PX_PER_MM;
   const spacing = (vp.itemSpacing ?? 0) * CSS_PX_PER_MM;
   const width = Math.max(1, vp.positionOnPage.width * CSS_PX_PER_MM - spacing);
   const height = Math.max(1, vp.positionOnPage.height * CSS_PX_PER_MM - titleBar - spacing);

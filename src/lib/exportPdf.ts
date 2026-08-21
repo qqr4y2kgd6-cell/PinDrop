@@ -46,7 +46,7 @@ export function pageSizeMm(layout: PrintLayout) {
  */
 function mapBodyBox(vp: MapViewport, itemSpacing = 0) {
   const border = vp.borderWidth ?? 0.1;
-  const title = vp.showTitle !== false ? TITLE_BAR_MM : 0;
+  const title = vp.showTitle !== false ? (vp.titleBarHeight ?? TITLE_BAR_MM) : 0;
   const fp = footprintDims(vp.rotation, vp.positionOnPage.width, vp.positionOnPage.height);
   const pad = itemSpacing / 2;
   const bw = Math.max(1, fp.w - pad * 2);
@@ -700,7 +700,7 @@ function drawViewportPdf(doc: jsPDF, page: PrintLayout, vp: MapViewport, img?: s
   const bw = Math.max(1, fp.w - pad * 2);
   const bh = Math.max(1, fp.h - pad * 2);
   const title = vp.showTitle !== false;
-  const titleH = title ? TITLE_BAR_MM : 0;
+  const titleH = title ? (vp.titleBarHeight ?? TITLE_BAR_MM) : 0;
   const radius = vp.roundedCorners ? (vp.cornerRadius ?? 4) : 0;
   // The map body is inset by the frame border on all sides, exactly like the
   // layout tile inside the frame's border-box → the map edges + rounded corners

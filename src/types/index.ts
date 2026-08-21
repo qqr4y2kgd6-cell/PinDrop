@@ -108,6 +108,8 @@ export interface MapViewport {
   layers?: MapLayerStyle;
   /** Stacking order for overlapping tiles (higher = on top). Default 0. */
   stackOrder?: number;
+  /** Title bar height in mm (default TITLE_BAR_MM = 7). */
+  titleBarHeight?: number;
 }
 
 export type ColorMode = 'bw' | 'grayscale' | 'spot';

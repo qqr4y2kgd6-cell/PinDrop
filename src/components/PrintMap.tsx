@@ -164,7 +164,7 @@ export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
   };
 
   const contentW = Math.max(1, (viewport?.positionOnPage.width ?? 1) - (layout.itemSpacing ?? 0));
-  const contentH = Math.max(1, (viewport?.positionOnPage.height ?? 1) - (viewport?.showTitle !== false ? TITLE_BAR_MM : 0) - (layout.itemSpacing ?? 0));
+  const contentH = Math.max(1, (viewport?.positionOnPage.height ?? 1) - (viewport?.showTitle !== false ? (viewport?.titleBarHeight ?? TITLE_BAR_MM) : 0) - (layout.itemSpacing ?? 0));
   const areaRef = useRef<HTMLDivElement>(null);
   const [boxSize, setBoxSize] = useState<{ w: number; h: number } | null>(null);
   const [containerReady, setContainerReady] = useState(false);
