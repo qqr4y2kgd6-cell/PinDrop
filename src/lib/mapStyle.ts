@@ -609,6 +609,7 @@ export function applyEnhancedLayerStyle(map: MapLibreMap, l: Required<MapLayerSt
       const contourUrl = contourDemSource.contourProtocolUrl({
         multiplier: 1,
         thresholds: {
+          0: [500, 1000],
           11: [200, 1000],
           12: [100, 500],
           14: [50, 200],
