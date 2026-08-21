@@ -542,9 +542,8 @@ export function applyEnhancedLayerStyle(map: MapLibreMap, l: Required<MapLayerSt
   // Ensure openmaptiles overlay layers exist
   ensureOverlayLayers(map);
 
-  // --- Contour lines (raster-dem source + hillshade + contour-line layers) ---
-  if (l.showContourLines) {
-    // Add DEM source on demand
+  // --- Terrain hillshade (raster-dem source + hillshade layer) ---
+  if (l.showTerrain) {
     if (!map.getSource(CONTOUR_SOURCE)) {
       try {
         map.addSource(CONTOUR_SOURCE, {
@@ -569,21 +568,32 @@ export function applyEnhancedLayerStyle(map: MapLibreMap, l: Required<MapLayerSt
         },
       }, 'poi-legs');
     }
+    map.setLayoutProperty('hillshade', 'visibility', 'visible');
+  } else {
+    setLayerVisibility(map, ['hillshade'], false);
+  }
+
+  // --- Contour lines (from openmaptiles contour source-layer) ---
+  if (l.showContourLines) {
     if (!map.getLayer('contour-lines')) {
       map.addLayer({
         id: 'contour-lines',
         type: 'line',
-        source: CONTOUR_SOURCE,
+        source: 'openmaptiles',
+        'source-layer': 'contour',
+        filter: ['match', ['get', 'level'], [0, 1], true, false] as FilterSpecification,
         paint: {
           'line-color': l.contourLineColor,
           'line-width': l.contourLineWidth,
+          'line-opacity': 0.6,
         },
       }, 'hillshade');
     }
+    map.setLayoutProperty('contour-lines', 'visibility', 'visible');
     map.setPaintProperty('contour-lines', 'line-color', l.contourLineColor);
     map.setPaintProperty('contour-lines', 'line-width', l.contourLineWidth);
   } else {
-    setLayerVisibility(map, ['hillshade', 'contour-lines'], false);
+    setLayerVisibility(map, ['contour-lines'], false);
   }
 
   // --- Satellite overlay (raster source + layer) ---
@@ -682,6 +692,9 @@ export const DEFAULT_LAYER_STYLE: Required<MapLayerStyle> = {
   contourLineWidth: 0.5,
   contourLabelColor: '#000000',
   contourLabelSize: 2.0,
+  // Terrain hillshade
+  showTerrain: false,
+  terrainOpacity: 0.5,
   // Satellite overlay
   showSatellite: false,
   satelliteOpacity: 0.7,

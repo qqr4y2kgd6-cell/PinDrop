@@ -156,6 +156,9 @@ export interface MapLayerStyle {
   contourLineWidth?: number;
   contourLabelColor?: string;
   contourLabelSize?: number;
+  // Terrain hillshade
+  showTerrain?: boolean;
+  terrainOpacity?: number;
   // Satellite overlay
   showSatellite?: boolean;
   satelliteOpacity?: number;

@@ -712,6 +712,10 @@ export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
 
               <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 text-xs">
                 <Label className="flex items-center gap-1.5 cursor-pointer">
+                  <Switch checked={layer('showTerrain')} onCheckedChange={(c) => updateLayers({ showTerrain: c })} />
+                  <Mountain className="h-3.5 w-3.5" /> Terrain
+                </Label>
+                <Label className="flex items-center gap-1.5 cursor-pointer">
                   <Switch checked={layer('showContourLines')} onCheckedChange={(c) => updateLayers({ showContourLines: c })} />
                   <Mountain className="h-3.5 w-3.5" /> Contours
                 </Label>
