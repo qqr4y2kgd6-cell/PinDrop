@@ -7,11 +7,18 @@ import { viewportBounds, clampBbox } from '@/lib/mapStyle';
 
 const STORAGE_KEY = 'pindrop-state';
 const THEMES_STORAGE_KEY = 'pindrop-themes';
+const MAX_HISTORY = 50;
 
 interface StoredState {
   pois: POI[];
   pages: PrintPage[];
   activePageId: string;
+}
+
+interface HistoryState {
+  past: StoredState[];
+  present: StoredState;
+  future: StoredState[];
 }
 
 function toPage(layout: PrintLayout, index: number): PrintPage {
@@ -237,12 +244,20 @@ interface MapContextType {
   applyTheme: (themeId: string) => void;
   saveTheme: (name: string) => string;
   removeTheme: (id: string) => void;
+  // Undo/Redo
+  canUndo: boolean;
+  canRedo: boolean;
+  undo: () => void;
+  redo: () => void;
 }
 
 const MapContext = createContext<MapContextType | undefined>(undefined);
 
 export function MapProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<StoredState>(getInitialState);
+  const [history, setHistory] = useState<HistoryState>(() => {
+    const initial = getInitialState();
+    return { past: [], present: initial, future: [] };
+  });
   const [activeViewportId, setActiveViewportId] = useState<string | null>(() => {
     const s = getInitialState();
     return s.pages.find((p) => p.id === s.activePageId)?.viewports[0]?.id ?? null;
@@ -250,8 +265,62 @@ export function MapProvider({ children }: { children: ReactNode }) {
 
   const activePageIdRef = useRef<string>(getInitialState().activePageId);
 
-  const { pois, pages, activePageId } = state;
+  const { present } = history;
+  const { pois, pages, activePageId } = present;
   const layout = pages.find((p) => p.id === activePageId) ?? pages[0];
+
+  const canUndo = history.past.length > 0;
+  const canRedo = history.future.length > 0;
+
+  // Helper to push current state to history and update
+  const pushHistory = useCallback((updater: (prev: StoredState) => StoredState) => {
+    setHistory((h) => {
+      const next = updater(h.present);
+      return {
+        past: [...h.past.slice(-(MAX_HISTORY - 1)), h.present],
+        present: next,
+        future: [],
+      };
+    });
+  }, []);
+
+  // Undo function
+  const undo = useCallback(() => {
+    setHistory((h) => {
+      if (h.past.length === 0) return h;
+      const [prev, ...rest] = h.past;
+      return { past: rest, present: prev, future: [h.present, ...h.future] };
+    });
+  }, []);
+
+  // Redo function
+  const redo = useCallback(() => {
+    setHistory((h) => {
+      if (h.future.length === 0) return h;
+      const [next, ...rest] = h.future;
+      return { past: [...h.past, h.present], present: next, future: rest };
+    });
+  }, []);
+
+  // Keyboard shortcuts for undo/redo
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        undo();
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'z' && e.shiftKey) {
+        e.preventDefault();
+        redo();
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'y') {
+        e.preventDefault();
+        redo();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [undo, redo]);
 
   useEffect(() => {
     activePageIdRef.current = activePageId;
@@ -261,49 +330,50 @@ export function MapProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const stored = loadFromStorage();
     if (stored) {
-      setState(stored);
+      setHistory({ past: [], present: stored, future: [] });
       const vp = stored.pages.find((p) => p.id === stored.activePageId)?.viewports[0]?.id ?? null;
       setActiveViewportId(vp);
     }
   }, []);
 
+  // Persist to localStorage (only present state)
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ pois, pages, activePageId }));
   }, [pois, pages, activePageId]);
 
   const updatePage = useCallback((pageId: string, updates: Partial<PrintLayout>) => {
-    setState((prev) => ({
+    pushHistory((prev) => ({
       ...prev,
       pages: prev.pages.map((p) => (p.id === pageId ? { ...p, ...updates } : p)),
     }));
-  }, []);
+  }, [pushHistory]);
 
   const updatePoi = useCallback((id: string, updates: Partial<POI>) => {
-    setState((prev) => ({ ...prev, pois: prev.pois.map((p) => (p.id === id ? { ...p, ...updates } : p)) }));
-  }, []);
+    pushHistory((prev) => ({ ...prev, pois: prev.pois.map((p) => (p.id === id ? { ...p, ...updates } : p)) }));
+  }, [pushHistory]);
 
   const togglePoiActive = useCallback((id: string) => {
-    setState((prev) => ({
+    pushHistory((prev) => ({
       ...prev,
       pois: prev.pois.map((p) => (p.id === id ? { ...p, active: !p.active } : p)),
     }));
-  }, []);
+  }, [pushHistory]);
 
   const addPoi = useCallback((poi: Omit<POI, 'id'> & { id?: string }) => {
-    setState((prev) => {
+    pushHistory((prev) => {
       const maxNum = Math.max(0, ...prev.pois.map((p) => p.customNumber || 0));
       const newPoi: POI = { ...poi, id: poi.id ?? `poi-${Date.now()}`, customNumber: maxNum + 1 };
       return { ...prev, pois: [...prev.pois, newPoi] };
     });
-  }, []);
+  }, [pushHistory]);
 
   const removePoi = useCallback((id: string) => {
-    setState((prev) => ({ ...prev, pois: prev.pois.filter((p) => p.id !== id) }));
-  }, []);
+    pushHistory((prev) => ({ ...prev, pois: prev.pois.filter((p) => p.id !== id) }));
+  }, [pushHistory]);
 
   const setPois = useCallback((next: POI[]) => {
-    setState((prev) => ({ ...prev, pois: next }));
-  }, []);
+    pushHistory((prev) => ({ ...prev, pois: next }));
+  }, [pushHistory]);
 
   const updateLayout = useCallback(
     (updates: Partial<PrintLayout>) => updatePage(activePageId, updates),
@@ -334,7 +404,7 @@ export function MapProvider({ children }: { children: ReactNode }) {
 
   const updatePageViewport = useCallback(
     (pageId: string, viewportId: string, updates: Partial<MapViewport>) => {
-      setState((prev) => ({
+      pushHistory((prev) => ({
         ...prev,
         pages: prev.pages.map((p) =>
           p.id === pageId
@@ -343,78 +413,78 @@ export function MapProvider({ children }: { children: ReactNode }) {
         ),
       }));
     },
-    []
+    [pushHistory]
   );
 
   const addPageViewport = useCallback((pageId: string, viewport: MapViewport) => {
-    setState((prev) => ({
+    pushHistory((prev) => ({
       ...prev,
       pages: prev.pages.map((p) => (p.id === pageId ? { ...p, viewports: [...p.viewports, ensureGridBbox(viewport)] } : p)),
     }));
-  }, []);
+  }, [pushHistory]);
 
   const removePageViewport = useCallback((pageId: string, viewportId: string) => {
-    setState((prev) => ({
+    pushHistory((prev) => ({
       ...prev,
       pages: prev.pages.map((p) =>
         p.id === pageId ? { ...p, viewports: p.viewports.filter((vp) => vp.id !== viewportId) } : p
       ),
     }));
-  }, []);
+  }, [pushHistory]);
 
   const addPageIndexList = useCallback((pageId: string, config: IndexListConfig) => {
-    setState((prev) => ({
+    pushHistory((prev) => ({
       ...prev,
       pages: prev.pages.map((p) => (p.id === pageId ? { ...p, indexLists: [...p.indexLists, config] } : p)),
     }));
-  }, []);
+  }, [pushHistory]);
 
   const updatePageIndexList = useCallback((pageId: string, indexId: string, updates: Partial<IndexListConfig>) => {
-    setState((prev) => ({
+    pushHistory((prev) => ({
       ...prev,
       pages: prev.pages.map((p) =>
         p.id === pageId ? { ...p, indexLists: p.indexLists.map((c) => (c.id === indexId ? { ...c, ...updates } : c)) } : p
       ),
     }));
-  }, []);
+  }, [pushHistory]);
 
   const removePageIndexList = useCallback((pageId: string, indexId: string) => {
-    setState((prev) => ({
+    pushHistory((prev) => ({
       ...prev,
       pages: prev.pages.map((p) => (p.id === pageId ? { ...p, indexLists: p.indexLists.filter((c) => c.id !== indexId) } : p)),
     }));
-  }, []);
+  }, [pushHistory]);
 
   const addPageTitleBlock = useCallback((pageId: string, config: TitleBlockConfig) => {
-    setState((prev) => ({
+    pushHistory((prev) => ({
       ...prev,
       pages: prev.pages.map((p) => (p.id === pageId ? { ...p, titleBlocks: [...p.titleBlocks, config] } : p)),
     }));
-  }, []);
+  }, [pushHistory]);
 
   const updatePageTitleBlock = useCallback((pageId: string, blockId: string, updates: Partial<TitleBlockConfig>) => {
-    setState((prev) => ({
+    pushHistory((prev) => ({
       ...prev,
       pages: prev.pages.map((p) =>
         p.id === pageId ? { ...p, titleBlocks: p.titleBlocks.map((c) => (c.id === blockId ? { ...c, ...updates } : c)) } : p
       ),
     }));
-  }, []);
+  }, [pushHistory]);
 
   const removePageTitleBlock = useCallback((pageId: string, blockId: string) => {
-    setState((prev) => ({
+    pushHistory((prev) => ({
       ...prev,
       pages: prev.pages.map((p) => (p.id === pageId ? { ...p, titleBlocks: p.titleBlocks.filter((c) => c.id !== blockId) } : p)),
     }));
-  }, []);
+  }, [pushHistory]);
 
   const setActivePageId = useCallback((id: string) => {
-    setState((prev) => (prev.activePageId === id ? prev : { ...prev, activePageId: id }));
+    pushHistory((prev) => (prev.activePageId === id ? prev : { ...prev, activePageId: id }));
     if (activePageIdRef.current !== id) setActiveViewportId(null);
-  }, []);
+  }, [pushHistory]);
 
   const addPage = useCallback(() => {
-    setState((prev) => {
+    pushHistory((prev) => {
       const source = prev.pages.find((p) => p.id === prev.activePageId) ?? prev.pages[0];
       const newPage: PrintPage = {
         ...clonePageItems(source),
@@ -424,18 +494,18 @@ export function MapProvider({ children }: { children: ReactNode }) {
       return { ...prev, pages: [...prev.pages, newPage], activePageId: newPage.id };
     });
     setActiveViewportId(null);
-  }, []);
+  }, [pushHistory]);
 
   const removePage = useCallback(
     (id: string) => {
-      setState((prev) => {
+      pushHistory((prev) => {
         if (prev.pages.length <= 1) return prev;
         const remaining = prev.pages.filter((p) => p.id !== id);
         const nextActive = prev.activePageId === id ? remaining[0].id : prev.activePageId;
         return { ...prev, pages: remaining, activePageId: nextActive };
       });
     },
-    []
+    [pushHistory]
   );
 
   const renamePage = useCallback(
@@ -526,6 +596,10 @@ export function MapProvider({ children }: { children: ReactNode }) {
         applyTheme,
         saveTheme,
         removeTheme,
+        canUndo,
+        canRedo,
+        undo,
+        redo,
       }}
     >
       {children}

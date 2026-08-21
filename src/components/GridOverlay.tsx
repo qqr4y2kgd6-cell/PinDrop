@@ -176,40 +176,7 @@ export function GridOverlay({
               </g>
             )}
 
-            {/* Coordinate labels on major ticks (hidden when grid refs are shown) */}
-            {viewport.showBorderTicks !== false && !showRefs && (
-              <g fill="#3c3c3c" fontFamily={titleFontCss('Helvetica')} fontSize={10}>
-                {border.ticks.map((t, i) => {
-                  if (!t.label) return null;
-                  if (t.edge === 'top') {
-                    return (
-                      <text key={`l-${i}`} x={proj.lngToX(t.lng!)} y={y - labelPad} textAnchor="middle">
-                        {t.label}
-                      </text>
-                    );
-                  }
-                  if (t.edge === 'bottom') {
-                    return (
-                      <text key={`l-${i}`} x={proj.lngToX(t.lng!)} y={y + height + labelPad + 9} textAnchor="middle">
-                        {t.label}
-                      </text>
-                    );
-                  }
-                  if (t.edge === 'left') {
-                    return (
-                      <text key={`l-${i}`} x={x - labelPad} y={proj.latToY(t.lat!) + 3} textAnchor="end">
-                        {t.label}
-                      </text>
-                    );
-                  }
-                  return (
-                    <text key={`l-${i}`} x={x + width + labelPad} y={proj.latToY(t.lat!) + 3} textAnchor="start">
-                      {t.label}
-                    </text>
-                  );
-                })}
-              </g>
-            )}
+
           </g>
         )}
 

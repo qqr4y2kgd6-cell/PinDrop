@@ -27,8 +27,8 @@ export function TitleBlockFrame({ layout, config, contentPx, isActive, onSelect,
   const fontWeight = config.fontWeight ?? 'bold';
   const textColor = config.textColor ?? '#1a1a1a';
   const backgroundColor = config.backgroundColor ?? '#ffffff';
-  const borderColor = config.borderColor ?? layout.spotColor;
-  const borderWidth = `${config.borderWidth ?? 0}mm`;
+  const borderColor = config.borderColor ?? '#000000';
+  const borderWidth = `${config.borderWidth ?? 0.1}mm`;
   const align = config.align ?? 'left';
 
   const frameStyle: React.CSSProperties = {

@@ -35,6 +35,7 @@ export function IndexListFrameWrapper({ layout, config, contentPx, isActive, onS
   const borderColor = resolved.borderColor;
   const backgroundColor = resolved.backgroundColor;
   const count = scopePois(pois, resolved, layout.viewports).length;
+  const maxHeightPx = resolved.maxHeight > 0 ? resolved.maxHeight * CSS_PX_PER_MM : undefined;
 
   const frameStyle: React.CSSProperties = {
     width: contentPx.w,
@@ -44,6 +45,7 @@ export function IndexListFrameWrapper({ layout, config, contentPx, isActive, onS
     borderColor,
     backgroundColor,
     overflow: 'hidden',
+    ...(maxHeightPx ? { maxHeight: maxHeightPx } : {}),
   };
 
   const rotTransform =
@@ -77,6 +79,8 @@ export function IndexListFrameWrapper({ layout, config, contentPx, isActive, onS
                 fontFamily: titleFontCss(resolved.titleFontFamily),
                 fontSize: `${titleFontSize}px`,
                 fontWeight: titleFontWeight,
+                padding: `${resolved.titlePadding * CSS_PX_PER_MM}px ${resolved.titlePadding * CSS_PX_PER_MM * 1.2}px`,
+                borderBottom: resolved.showTitleBorder ? `${resolved.titleBorderWidth * CSS_PX_PER_MM}px solid ${resolved.titleBorderColor}` : 'none',
               }}
             >
               <span className="truncate">{title}</span>

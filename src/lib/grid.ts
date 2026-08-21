@@ -453,3 +453,170 @@ export function buildGridGeoJSON(
 
   return { type: 'FeatureCollection', features };
 }
+
+// --- Scale bar ---
+
+/** Nice round distances for scale bars, in meters. */
+const SCALE_BAR_NICE = [
+  1, 2, 5, 10, 20, 50, 100, 200, 500,
+  1000, 2000, 5000, 10000, 20000, 50000,
+  100000, 200000, 500000, 1000000,
+];
+
+export interface ScaleBarTick {
+  /** Position along the bar in mm (0 = left edge). */
+  mm: number;
+  /** Label text (e.g. "0", "50", "100"). */
+  label: string;
+  /** Whether to draw a full-height tick (major) or half-height (minor). */
+  major: boolean;
+}
+
+export interface ScaleBarResult {
+  /** Total bar width in mm. */
+  barMm: number;
+  /** The total distance the bar covers, in meters. */
+  distanceM: number;
+  /** Scale denominator text, e.g. "1:25 000". */
+  scaleText: string;
+  /** Ticks to render along the bar. */
+  ticks: ScaleBarTick[];
+}
+
+/**
+ * Computes a tick-style scale bar for a viewport.
+ *
+ * The bar is split into segments (typically 2–5), each labeled with its
+ * cumulative distance. The left edge is always "0". Total bar width targets
+ * ~25 mm on the printed page.
+ */
+export function computeScaleBar(
+  latitude: number,
+  zoom: number,
+  labelScale = 1,
+): ScaleBarResult {
+  const mpp = (156543.03392 * Math.cos((latitude * Math.PI) / 180)) / Math.pow(2, zoom);
+  // Target ~25 mm on the printed page (CSS_PX_PER_MM = 2 → 50 px at 1:1)
+  const targetBarPx = 50 * labelScale;
+  const targetBarM = targetBarPx * mpp;
+
+  // Pick the nicest total distance ≤ target
+  let totalM = SCALE_BAR_NICE[0];
+  for (const n of SCALE_BAR_NICE) {
+    if (n <= targetBarM) totalM = n;
+  }
+
+  const barPx = totalM / mpp;
+  const barMm = barPx / (2 * labelScale); // CSS_PX_PER_MM = 2
+
+  // Number of segments: prefer 2 or 5
+  const numSegments = totalM >= 500 || (totalM / 5) * 5 === totalM ? 5 : 2;
+  const segM = totalM / numSegments;
+
+  const ticks: ScaleBarTick[] = [];
+  for (let i = 0; i <= numSegments; i++) {
+    const dist = segM * i;
+    const mmPos = (barMm / numSegments) * i;
+    const isMajor = i === 0 || i === numSegments || (numSegments === 5 && i === 2);
+    ticks.push({
+      mm: mmPos,
+      label: formatScaleBarDistance(dist),
+      major: isMajor,
+    });
+  }
+
+  // Scale denominator
+  const scaleDenom = Math.round(mpp * (96 / 0.0254));
+  const scaleText = `1:${scaleDenom.toLocaleString()}`;
+
+  return { barMm, distanceM: totalM, scaleText, ticks };
+}
+
+/** Format a distance for a scale bar tick (e.g. 0, 50, 100, 1.5 km). */
+function formatScaleBarDistance(meters: number): string {
+  if (meters === 0) return '0';
+  if (meters >= 1000) {
+    const km = meters / 1000;
+    return `${km % 1 === 0 ? km : km.toFixed(1)} km`;
+  }
+  return `${meters}`;
+}
+
+/** Human-readable label for a scale bar distance. */
+export function scaleBarDistanceLabel(meters: number): string {
+  if (meters >= 1000) {
+    const km = meters / 1000;
+    return `${km % 1 === 0 ? km : km.toFixed(1)} km`;
+  }
+  return `${meters} m`;
+}
+
+// --- Cartographic zoom levels ---
+
+/**
+ * Standard cartographic scale denominators. These are the "round" scales
+ * used on topographic maps worldwide.
+ */
+export const CARTOGRAPHIC_SCALES = [
+  { denom: 1000, label: '1:1 000' },
+  { denom: 2500, label: '1:2 500' },
+  { denom: 5000, label: '1:5 000' },
+  { denom: 10000, label: '1:10 000' },
+  { denom: 15000, label: '1:15 000' },
+  { denom: 20000, label: '1:20 000' },
+  { denom: 25000, label: '1:25 000' },
+  { denom: 30000, label: '1:30 000' },
+  { denom: 40000, label: '1:40 000' },
+  { denom: 50000, label: '1:50 000' },
+  { denom: 75000, label: '1:75 000' },
+  { denom: 100000, label: '1:100 000' },
+  { denom: 200000, label: '1:200 000' },
+  { denom: 250000, label: '1:250 000' },
+  { denom: 500000, label: '1:500 000' },
+  { denom: 1000000, label: '1:1 000 000' },
+];
+
+/**
+ * Returns the zoom level that gives the closest match to a cartographic
+ * scale denominator at a given latitude.
+ */
+export function zoomForScale(denom: number, latitude: number): number {
+  // meters per pixel = denom / (96 / 0.0254)  (96 DPI, meters per px)
+  const targetMpp = denom / (96 / 0.0254);
+  // mpp = 156543.03392 * cos(lat) / 2^zoom
+  // zoom = log2(156543.03392 * cos(lat) / targetMpp)
+  const cosLat = Math.cos((latitude * Math.PI) / 180);
+  return Math.log2((156543.03392 * cosLat) / targetMpp);
+}
+
+/**
+ * Given current zoom and latitude, returns the nearest cartographic zoom
+ * level. `dir` is +1 (zoom in) or -1 (zoom out).
+ */
+export function nearestCartographicZoom(
+  currentZoom: number,
+  latitude: number,
+  dir: 1 | -1,
+): { zoom: number; scale: typeof CARTOGRAPHIC_SCALES[number] } | null {
+  const cosLat = Math.cos((latitude * Math.PI) / 180);
+  const currentMpp = (156543.03392 * cosLat) / Math.pow(2, currentZoom);
+
+  let best: { zoom: number; scale: typeof CARTOGRAPHIC_SCALES[number]; diff: number } | null = null;
+
+  for (const s of CARTOGRAPHIC_SCALES) {
+    const z = zoomForScale(s.denom, latitude);
+    const diff = z - currentZoom;
+
+    // Must be strictly in the requested direction (skip if at or beyond the current zoom)
+    if (dir === 1 && diff <= 0.01) continue; // zoom in → need z > current + margin
+    if (dir === -1 && diff >= -0.01) continue; // zoom out → need z < current - margin
+
+    const absDiff = Math.abs(diff);
+    if (!best || absDiff < best.diff) {
+      best = { zoom: z, scale: s, diff: absDiff };
+    }
+  }
+
+  if (!best) return null;
+  return { zoom: best.zoom, scale: best.scale };
+}

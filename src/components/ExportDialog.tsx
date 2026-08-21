@@ -180,7 +180,7 @@ export function ExportDialog({ open, onOpenChange, pages, pois, autoDownload }: 
                         const title = vp.showTitle !== false;
                         const titleH = titleHmm * PX_PER_MM;
                         const borderColor = vp.borderColor || '#000';
-                        const bPx = (vp.borderWidth ?? 1) * PX_PER_MM;
+                        const bPx = (vp.borderWidth ?? 0.1) * PX_PER_MM;
                         const padPx = (page.itemSpacing ?? 0) * PX_PER_MM * 0.5;
                         const family = vp.titleFontFamily ?? page.titleFontFamily;
                         const fontSize = Math.max(8, (vp.titleFontSize ?? page.titleFontSize ?? 3) * PX_PER_MM);
@@ -210,7 +210,7 @@ export function ExportDialog({ open, onOpenChange, pages, pois, autoDownload }: 
                                   style={{
                                     height: titleH,
                                     backgroundColor: titleBackground
-                                      ? (vp.titleBackgroundColor || page.defaultTitleBackgroundColor || page.spotColor)
+                                      ? (vp.titleBackgroundColor || page.defaultTitleBackgroundColor || '#ffffff')
                                       : '#fafafa',
                                     color: titleTextColor,
                                     borderBottom: vp.titleBackground === false ? `1px solid ${borderColor}` : 'none',

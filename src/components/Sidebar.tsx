@@ -152,7 +152,7 @@ function parsePaste(text: string): ParsedPOI[] {
   }
 }
 
-export function Sidebar() {
+export function Sidebar({ onClose }: { onClose?: () => void }) {
   const { pois, updatePoi, togglePoiActive, setPois, addPoi, removePoi, editingPoiId, setEditingPoiId } = useMap();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterRegion, setFilterRegion] = useState<string>('all');
@@ -293,10 +293,17 @@ export function Sidebar() {
   }, [pois, updatePoi]);
 
   return (
-    <div className="w-80 min-h-0 flex flex-col border-r border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 overflow-y-auto">
-      <div className="p-4 border-b border-zinc-200 dark:border-zinc-800">
-        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">PinDrop</h2>
-        <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">{pois.filter(p => p.active).length} / {pois.length} active</p>
+    <div className="w-80 h-full min-h-0 flex flex-col border-r border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 overflow-y-auto">
+      <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">PinDrop</h2>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">{pois.filter(p => p.active).length} / {pois.length} active</p>
+        </div>
+        {onClose && (
+          <Button variant="ghost" size="icon" className="h-8 w-8 md:hidden" onClick={onClose}>
+            <X className="h-4 w-4" />
+          </Button>
+        )}
       </div>
 
       <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 space-y-2">

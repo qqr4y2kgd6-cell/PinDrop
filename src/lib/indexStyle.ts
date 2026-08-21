@@ -12,7 +12,27 @@ export interface ResolvedIndex {
   categoryOrder: string[];
   showTitle: boolean;
   showIcons: boolean;
+  iconSize: number; // mm
+  titlePadding: number; // mm
+  // Category header
+  categorySeparatorStyle: 'none' | 'underline' | 'line';
+  categorySeparatorColor: string;
+  categorySeparatorWidth: number; // mm
+  /** @deprecated Use categorySeparatorStyle. */
   showCategoryUnderline: boolean;
+  // Number formatting
+  numberFormat: 'number' | 'paren' | 'dot' | 'dash';
+  numberFontFamily: string;
+  numberFontSize: number;
+  numberFontWeight: 'normal' | 'medium' | 'bold';
+  // Layout
+  textAlign: 'left' | 'center' | 'right';
+  columnGap: number; // mm
+  columnWidths: number[]; // relative weights
+  maxHeight: number; // mm, 0 = unlimited
+  overflow: 'clip' | 'ellipsis' | 'page';
+  showGridRefs: boolean;
+  // Frame
   roundedCorners: boolean;
   cornerRadius: number;
   borderWidth: number;
@@ -23,6 +43,9 @@ export interface ResolvedIndex {
   titleFontFamily: string;
   titleFontSize: number;
   titleFontWeight: 'normal' | 'medium' | 'bold';
+  showTitleBorder: boolean;
+  titleBorderWidth: number;
+  titleBorderColor: string;
   bodyFontFamily: string;
   bodyFontSize: number;
   bodyFontWeight: 'normal' | 'medium' | 'bold';
@@ -33,6 +56,11 @@ export interface ResolvedIndex {
   categoryColor: string;
   /** Inner padding of the index body, in mm. */
   padding: number;
+  /** Per-side inner padding (mm). */
+  paddingTop: number;
+  paddingRight: number;
+  paddingBottom: number;
+  paddingLeft: number;
   /** Vertical pitch between index rows, in mm. */
   lineHeight: number;
 }
@@ -43,6 +71,21 @@ export function resolveIndexConfig(config: IndexListConfig, page: PrintLayout): 
   const rawGroupBy = config.groupBy as string | boolean;
   const groupBy: 'none' | 'category' | 'map' =
     rawGroupBy === 'map' ? 'map' : rawGroupBy === 'none' || rawGroupBy === false ? 'none' : 'category';
+
+  // Migrate deprecated showCategoryUnderline → categorySeparatorStyle
+  const rawSepStyle = config.categorySeparatorStyle ?? page.indexListCategorySeparatorStyle;
+  const categorySeparatorStyle: 'none' | 'underline' | 'line' =
+    rawSepStyle !== undefined
+      ? rawSepStyle
+      : config.showCategoryUnderline === false
+        ? 'none'
+        : 'underline';
+
+  const numberFormat = config.numberFormat ?? page.indexListNumberFormat ?? 'number';
+  const numberFontFamily = config.numberFontFamily ?? page.indexListNumberFontFamily ?? bodyFontFamily;
+  const numberFontSize = config.numberFontSize ?? page.indexListNumberFontSize ?? bodyFontSize;
+  const numberFontWeight = config.numberFontWeight ?? page.indexListNumberFontWeight ?? 'bold';
+
   return {
     title: config.title ?? page.indexListTitle ?? 'Index',
     columns: Math.max(1, Math.round(config.columns ?? page.indexColumns ?? 2) || 1),
@@ -53,19 +96,41 @@ export function resolveIndexConfig(config: IndexListConfig, page: PrintLayout): 
     categoryOrder: config.categoryOrder ?? [],
     showTitle: config.showTitle ?? page.indexListShowTitle ?? true,
     showIcons: config.showIcons ?? true,
-    showCategoryUnderline: config.showCategoryUnderline ?? true,
+    iconSize: config.iconSize ?? page.indexListIconSize ?? 3.5,
+    titlePadding: config.titlePadding ?? page.indexListTitlePadding ?? 2.5,
+    // Category header
+    categorySeparatorStyle,
+    categorySeparatorColor: config.categorySeparatorColor ?? page.indexListCategorySeparatorColor ?? (config.showCategoryUnderline !== false ? '#e0563d' : '#000000'),
+    categorySeparatorWidth: config.categorySeparatorWidth ?? page.indexListCategorySeparatorWidth ?? 0.2,
+    showCategoryUnderline: categorySeparatorStyle === 'underline',
+    // Number formatting
+    numberFormat,
+    numberFontFamily,
+    numberFontSize,
+    numberFontWeight,
+    // Layout
+    textAlign: config.textAlign ?? page.indexListTextAlign ?? 'left',
+    columnGap: config.columnGap ?? page.indexListColumnGap ?? 3,
+    columnWidths: config.columnWidths ?? [],
+    maxHeight: config.maxHeight ?? page.indexListMaxHeight ?? 0,
+    overflow: config.overflow ?? page.indexListOverflow ?? 'clip',
+    showGridRefs: config.showGridRefs ?? page.indexListShowGridRefs ?? true,
+    // Frame
     roundedCorners: config.roundedCorners ?? page.indexListRoundedCorners ?? false,
     cornerRadius: config.cornerRadius ?? page.indexListCornerRadius ?? 4,
-    borderWidth: config.borderWidth ?? page.indexListBorderWidth ?? 1,
+    borderWidth: config.borderWidth ?? page.indexListBorderWidth ?? 0.1,
     borderColor: config.borderColor ?? page.indexListBorderColor ?? '#000000',
     backgroundColor: config.backgroundColor ?? page.indexListBackgroundColor ?? '#ffffff',
     titleBackgroundColor:
-      config.titleBackgroundColor ?? page.indexListTitleBackgroundColor ?? page.defaultTitleBackgroundColor ?? page.spotColor,
+      config.titleBackgroundColor ?? page.indexListTitleBackgroundColor ?? page.defaultTitleBackgroundColor ?? '#ffffff',
     titleTextColor:
-      config.titleTextColor ?? page.indexListTitleTextColor ?? page.defaultTitleTextColor ?? '#ffffff',
+      config.titleTextColor ?? page.indexListTitleTextColor ?? page.defaultTitleTextColor ?? '#000000',
     titleFontFamily: config.titleFontFamily ?? page.indexListTitleFontFamily ?? page.titleFontFamily ?? 'Helvetica',
     titleFontSize: config.titleFontSize ?? page.indexListTitleFontSize ?? page.titleFontSize ?? 3,
     titleFontWeight: config.titleFontWeight ?? page.indexListTitleFontWeight ?? page.titleFontWeight ?? 'bold',
+    showTitleBorder: config.showTitleBorder ?? false,
+    titleBorderWidth: config.titleBorderWidth ?? 0.1,
+    titleBorderColor: config.titleBorderColor ?? (config.borderColor ?? page.indexListBorderColor ?? '#000000'),
     bodyFontFamily,
     bodyFontSize,
     bodyFontWeight: config.bodyFontWeight ?? page.indexListBodyFontWeight ?? 'normal',
@@ -75,6 +140,10 @@ export function resolveIndexConfig(config: IndexListConfig, page: PrintLayout): 
     categoryFontWeight: config.categoryFontWeight ?? page.indexListCategoryFontWeight ?? 'bold',
     categoryColor: config.categoryColor ?? page.indexListCategoryColor ?? '#1a1a1a',
     padding: config.padding ?? page.indexListPadding ?? 1.5,
+    paddingTop: config.paddingTop ?? page.indexListPaddingTop ?? config.padding ?? page.indexListPadding ?? 1.5,
+    paddingRight: config.paddingRight ?? page.indexListPaddingRight ?? config.padding ?? page.indexListPadding ?? 1.5,
+    paddingBottom: config.paddingBottom ?? page.indexListPaddingBottom ?? config.padding ?? page.indexListPadding ?? 1.5,
+    paddingLeft: config.paddingLeft ?? page.indexListPaddingLeft ?? config.padding ?? page.indexListPadding ?? 1.5,
     lineHeight: config.lineHeight ?? page.indexListLineHeight ?? Math.max(1.2, Math.round(bodyFontSize * 1.3 * 10) / 10),
   };
 }

@@ -5,11 +5,12 @@ import { Map, LngLatBounds } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { MapViewport, MapLayerStyle, PlaceNameTierStyle, PlaceNamesConfig, PlaceNameLang } from '@/types';
 import { useMap } from '@/context/MapContext';
-import { createPrintStyle, addPoiLayer, clampBbox, applyLayerStyleOverrides, DEFAULT_LAYER_STYLE, EDITOR_LABEL_SCALE, viewportActivePois, insetViewports, resolvePlaceNames, type PlaceNameTierKey } from '@/lib/mapStyle';
+import { createPrintStyle, addPoiLayer, clampBbox, applyLayerStyleOverrides, applyEnhancedLayerStyle, viewportBounds, DEFAULT_LAYER_STYLE, EDITOR_LABEL_SCALE, viewportActivePois, insetViewports, resolvePlaceNames, type PlaceNameTierKey } from '@/lib/mapStyle';
+import { nearestCartographicZoom } from '@/lib/grid';
 import { TITLE_BAR_MM } from '@/lib/units';
 import { GridOverlay } from './GridOverlay';
 import { Button } from '@/components/ui/button';
-import { Target, Grid, ZoomIn, ZoomOut, Road, Building, Waves, TreePine, MapPin, Landmark, Building2, Home, Map as MapIcon, Anchor, ChevronDown, ChevronRight, type LucideIcon } from 'lucide-react';
+import { Target, Grid, ZoomIn, ZoomOut, Road, Building, Waves, TreePine, MapPin, Landmark, Building2, Home, Map as MapIcon, Anchor, ChevronDown, ChevronRight, Mountain, Satellite, Train, Footprints, Flag, type LucideIcon } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -289,11 +290,15 @@ export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
     const onStyleReady = () => {
       addPoiLayer(map, viewportActivePois(pois, viewport), colorMode, spotColor, viewport.spiderify !== false, viewport.poiMarkerScale ?? 1);
       applyLayerStyleOverrides(map, viewport?.layers, EDITOR_LABEL_SCALE);
+      if (viewport?.layers) {
+        const l = { ...DEFAULT_LAYER_STYLE, ...viewport.layers };
+        applyEnhancedLayerStyle(map, l);
+      } else {
+        applyEnhancedLayerStyle(map, { ...DEFAULT_LAYER_STYLE });
+      }
       if (viewport.bbox) {
         fitToBbox(map, viewport.bbox);
       }
-      // From here on, bbox writes are allowed (the initial settle already ran
-      // with done=false, and the programmatic fit above suppresses bbox).
       fittedRef.current.done = true;
     };
 
@@ -402,7 +407,10 @@ export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    const apply = () => applyLayerStyleOverrides(map, viewport?.layers, EDITOR_LABEL_SCALE);
+    const apply = () => {
+      applyLayerStyleOverrides(map, viewport?.layers, EDITOR_LABEL_SCALE);
+      applyEnhancedLayerStyle(map, { ...DEFAULT_LAYER_STYLE, ...viewport?.layers });
+    };
     if (map.isStyleLoaded()) {
       apply();
     } else {
@@ -482,10 +490,30 @@ export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
             <div className="flex items-center justify-between">
               <Label className="text-sm font-semibold">{viewport.title}</Label>
               <div className="flex gap-1">
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => mapRef.current?.zoomIn()} title="Zoom In">
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => {
+                  const map = mapRef.current;
+                  if (!map) return;
+                  const result = nearestCartographicZoom(viewport.zoom, viewport.center[1], 1);
+                  if (result) {
+                    const newBbox = viewportBounds({ center: viewport.center, zoom: result.zoom, positionOnPage: viewport.positionOnPage, showTitle: viewport.showTitle });
+                    onViewportChange(viewport.id, { zoom: result.zoom, bbox: newBbox });
+                  } else {
+                    map.zoomIn();
+                  }
+                }} title="Zoom to nearest cartographic scale">
                   <ZoomIn className="h-4 w-4" />
                 </Button>
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => mapRef.current?.zoomOut()} title="Zoom Out">
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => {
+                  const map = mapRef.current;
+                  if (!map) return;
+                  const result = nearestCartographicZoom(viewport.zoom, viewport.center[1], -1);
+                  if (result) {
+                    const newBbox = viewportBounds({ center: viewport.center, zoom: result.zoom, positionOnPage: viewport.positionOnPage, showTitle: viewport.showTitle });
+                    onViewportChange(viewport.id, { zoom: result.zoom, bbox: newBbox });
+                  } else {
+                    map.zoomOut();
+                  }
+                }} title="Zoom to nearest cartographic scale">
                   <ZoomOut className="h-4 w-4" />
                 </Button>
                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={fitToPOIs} title="Fit to POIs">
@@ -650,6 +678,31 @@ export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
                 {controlRow('Water', layer('waterColor'), (c) => updateLayers({ waterColor: c }), layer('waterOpacity'), (n) => updateLayers({ waterOpacity: n }))}
                 {controlRow('Parks', layer('parkColor'), (c) => updateLayers({ parkColor: c }), layer('parkOpacity'), (n) => updateLayers({ parkOpacity: n }))}
                 {controlRow('Land', layer('landColor'), (c) => updateLayers({ landColor: c }), 1, () => {}, ['1'])}
+              </div>
+
+              <Separator />
+
+              <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 text-xs">
+                <Label className="flex items-center gap-1.5 cursor-pointer">
+                  <Switch checked={layer('showContourLines')} onCheckedChange={(c) => updateLayers({ showContourLines: c })} />
+                  <Mountain className="h-3.5 w-3.5" /> Contours
+                </Label>
+                <Label className="flex items-center gap-1.5 cursor-pointer">
+                  <Switch checked={layer('showSatellite')} onCheckedChange={(c) => updateLayers({ showSatellite: c })} />
+                  <Satellite className="h-3.5 w-3.5" /> Satellite
+                </Label>
+                <Label className="flex items-center gap-1.5 cursor-pointer">
+                  <Switch checked={layer('showTransitStops')} onCheckedChange={(c) => updateLayers({ showTransitStops: c })} />
+                  <Train className="h-3.5 w-3.5" /> Transit
+                </Label>
+                <Label className="flex items-center gap-1.5 cursor-pointer">
+                  <Switch checked={layer('showTrails')} onCheckedChange={(c) => updateLayers({ showTrails: c })} />
+                  <Footprints className="h-3.5 w-3.5" /> Trails
+                </Label>
+                <Label className="flex items-center gap-1.5 cursor-pointer">
+                  <Switch checked={layer('showAdminLabels')} onCheckedChange={(c) => updateLayers({ showAdminLabels: c })} />
+                  <Flag className="h-3.5 w-3.5" /> Admin labels
+                </Label>
               </div>
 
               <Separator />

@@ -5,12 +5,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PrintLayout } from '@/types';
-import { FileDown, Eye } from 'lucide-react';
+import { FileDown, Eye, Undo2, Redo2, ArrowUp, ArrowDown } from 'lucide-react';
 import { ExportDialog } from './ExportDialog';
 import { useState } from 'react';
 
 export function Toolbar() {
-  const { layout, updateLayout, pois, pages } = useMap();
+  const { layout, updateLayout, pois, pages, canUndo, canRedo, undo, redo, activeViewportId, updateViewport } = useMap();
   const [exportOpen, setExportOpen] = useState(false);
   const [autoDownload, setAutoDownload] = useState(false);
 
@@ -82,6 +82,56 @@ export function Toolbar() {
         </div>
 
         <div className="flex items-center gap-2 ml-auto">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={undo}
+            disabled={!canUndo}
+            title="Undo (Ctrl+Z)"
+            className="h-8 w-8 p-0"
+          >
+            <Undo2 className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={redo}
+            disabled={!canRedo}
+            title="Redo (Ctrl+Shift+Z)"
+            className="h-8 w-8 p-0"
+          >
+            <Redo2 className="h-4 w-4" />
+          </Button>
+          {activeViewportId && (
+            <>
+              <div className="w-px h-5 bg-zinc-200 dark:bg-zinc-700" />
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  const vp = layout.viewports.find(v => v.id === activeViewportId);
+                  if (vp) updateViewport(activeViewportId, { stackOrder: (vp.stackOrder ?? 0) + 1 });
+                }}
+                title="Bring Forward"
+                className="h-8 w-8 p-0"
+              >
+                <ArrowUp className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  const vp = layout.viewports.find(v => v.id === activeViewportId);
+                  if (vp) updateViewport(activeViewportId, { stackOrder: (vp.stackOrder ?? 0) - 1 });
+                }}
+                title="Send Backward"
+                className="h-8 w-8 p-0"
+              >
+                <ArrowDown className="h-4 w-4" />
+              </Button>
+            </>
+          )}
+          <div className="w-px h-5 bg-zinc-200 dark:bg-zinc-700" />
           <Button
             variant="outline"
             size="sm"

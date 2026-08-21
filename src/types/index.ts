@@ -90,6 +90,8 @@ export interface MapViewport {
   rotation?: 0 | 90 | 180 | 270;
   // Layout appearance
   showTitle?: boolean;
+  showScaleBar?: boolean;
+  showScaleText?: boolean;
   titleBackground?: boolean;
   titleBackgroundColor?: string;
   titleTextColor?: string;
@@ -104,6 +106,8 @@ export interface MapViewport {
   titleFontWeight?: 'normal' | 'medium' | 'bold';
   /** Map layer toggles + colors (roads/buildings/water/parks/land). */
   layers?: MapLayerStyle;
+  /** Stacking order for overlapping tiles (higher = on top). Default 0. */
+  stackOrder?: number;
 }
 
 export type ColorMode = 'bw' | 'grayscale' | 'spot';
@@ -144,6 +148,29 @@ export interface MapLayerStyle {
   landColor?: string;
   /** Place-name labels (settlements, admin regions, islands, water, roads). */
   placeNames?: PlaceNamesConfig;
+  // Contour lines (from DEM tiles)
+  showContourLines?: boolean;
+  contourLineColor?: string;
+  contourLineWidth?: number;
+  contourLabelColor?: string;
+  contourLabelSize?: number;
+  // Satellite overlay
+  showSatellite?: boolean;
+  satelliteOpacity?: number;
+  // Transit stops (bus, rail, tram, subway)
+  showTransitStops?: boolean;
+  transitStopColor?: string;
+  transitStopSize?: number;
+  // Trails / hiking paths
+  showTrails?: boolean;
+  trailColor?: string;
+  trailWidth?: number;
+  trailDashArray?: number[];
+  // Administrative boundaries (enhanced)
+  showAdminBoundaries?: boolean;
+  adminBoundaryColor?: string;
+  adminBoundaryWidth?: number;
+  showAdminLabels?: boolean;
 }
 
 export interface PlaceNameTierStyle {
@@ -200,15 +227,45 @@ export interface IndexListConfig {
   groupBy: 'none' | 'category' | 'map';
   categoryOrder?: string[];
   rotation?: 0 | 90 | 180 | 270;
+  /** Stacking order for overlapping tiles (higher = on top). Default 0. */
+  stackOrder?: number;
+  // Layout
+  textAlign?: 'left' | 'center' | 'right';
+  columnGap?: number; // mm
+  /** Relative widths for each column (e.g. [2, 1] makes the first column twice as wide). */
+  columnWidths?: number[];
+  /** Maximum tile height in mm (0 = unlimited). */
+  maxHeight?: number;
+  overflow?: 'clip' | 'ellipsis' | 'page';
+  /** Show grid reference labels (C1, B2, etc.) next to POI entries. */
+  showGridRefs?: boolean;
   // Style overrides (fall back to page-level indexList* fields)
   /** Inner padding of the index body, in mm. Falls back to the page default. */
   padding?: number;
+  /** Per-side inner padding (mm). Override the uniform `padding` for individual sides. */
+  paddingTop?: number;
+  paddingRight?: number;
+  paddingBottom?: number;
+  paddingLeft?: number;
   /** Vertical pitch between index rows, in mm. Falls back to the page default. */
   lineHeight?: number;
   showTitle?: boolean;
   showIcons?: boolean;
-  /** Draw the line underneath category headers. */
+  iconSize?: number; // mm
+  titlePadding?: number; // mm, padding inside title bar
+  // Category header styling
+  categorySeparatorStyle?: 'none' | 'underline' | 'line';
+  categorySeparatorColor?: string;
+  categorySeparatorWidth?: number; // mm
+  /** @deprecated Use categorySeparatorStyle instead. Migrated automatically. */
   showCategoryUnderline?: boolean;
+  // Number formatting
+  numberFormat?: 'number' | 'paren' | 'dot' | 'dash';
+  // Number-specific font (falls back to body font)
+  numberFontFamily?: string;
+  numberFontSize?: number;
+  numberFontWeight?: 'normal' | 'medium' | 'bold';
+  // Frame
   roundedCorners?: boolean;
   cornerRadius?: number;
   borderWidth?: number;
@@ -219,6 +276,12 @@ export interface IndexListConfig {
   titleFontFamily?: string;
   titleFontSize?: number;
   titleFontWeight?: 'normal' | 'medium' | 'bold';
+  /** Show a border below the title bar header. Default false. */
+  showTitleBorder?: boolean;
+  /** Border width for the title bar header, in mm. Default 0.1. */
+  titleBorderWidth?: number;
+  /** Border color for the title bar header. Default inherits frame borderColor. */
+  titleBorderColor?: string;
   bodyFontFamily?: string;
   bodyFontSize?: number;
   bodyFontWeight?: 'normal' | 'medium' | 'bold';
@@ -244,6 +307,8 @@ export interface TitleBlockConfig {
   backgroundColor?: string;
   borderColor?: string;
   borderWidth?: number;
+  /** Stacking order for overlapping tiles (higher = on top). Default 0. */
+  stackOrder?: number;
 }
 
 export interface PrintLayout {
@@ -294,8 +359,31 @@ export interface PrintLayout {
   indexListCategoryColor?: string; // hex
   /** Index list body inner padding, in mm. */
   indexListPadding?: number;
+  /** Per-side index list padding (mm). Override the uniform padding. */
+  indexListPaddingTop?: number;
+  indexListPaddingRight?: number;
+  indexListPaddingBottom?: number;
+  indexListPaddingLeft?: number;
   /** Index list row pitch, in mm. */
   indexListLineHeight?: number;
+  // Index list layout
+  indexListTextAlign?: 'left' | 'center' | 'right';
+  indexListColumnGap?: number; // mm
+  indexListMaxHeight?: number; // mm, 0 = unlimited
+  indexListOverflow?: 'clip' | 'ellipsis' | 'page';
+  indexListShowGridRefs?: boolean;
+  // Index list category separator
+  indexListCategorySeparatorStyle?: 'none' | 'underline' | 'line';
+  indexListCategorySeparatorColor?: string;
+  indexListCategorySeparatorWidth?: number; // mm
+  // Index list number formatting
+  indexListNumberFormat?: 'number' | 'paren' | 'dot' | 'dash';
+  indexListNumberFontFamily?: string;
+  indexListNumberFontSize?: number;
+  indexListNumberFontWeight?: 'normal' | 'medium' | 'bold';
+  // Index list icon and title padding
+  indexListIconSize?: number; // mm
+  indexListTitlePadding?: number; // mm
 }
 
 export type PrintPage = PrintLayout & { id: string; name: string };

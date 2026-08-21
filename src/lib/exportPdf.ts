@@ -45,7 +45,7 @@ export function pageSizeMm(layout: PrintLayout) {
  * corners / edges will not match the layout.
  */
 function mapBodyBox(vp: MapViewport, itemSpacing = 0) {
-  const border = vp.borderWidth ?? 1;
+  const border = vp.borderWidth ?? 0.1;
   const title = vp.showTitle !== false ? TITLE_BAR_MM : 0;
   const fp = footprintDims(vp.rotation, vp.positionOnPage.width, vp.positionOnPage.height);
   const pad = itemSpacing / 2;
@@ -305,6 +305,9 @@ function drawIndexContentPdf(doc: jsPDF, page: PrintLayout, pois: POI[], config:
   const catFontStyle = resolved.categoryFontWeight === 'normal' ? 'normal' : 'bold';
   const catFontSize = resolved.categoryFontSize * MM_TO_PT;
   const [catCr, catCg, catCb] = hexToRgb(resolved.categoryColor);
+  const numFontFamily = titleFontPdf(resolved.numberFontFamily).family;
+  const numFontSize = resolved.numberFontSize * MM_TO_PT;
+  const [numCr, numCg, numCb] = (() => { const [cr, cg, cb] = hexToRgb(page.spotColor); return [cr, cg, cb]; })();
 
   const showTitle = resolved.showTitle;
   const title = resolved.title;
@@ -314,8 +317,12 @@ function drawIndexContentPdf(doc: jsPDF, page: PrintLayout, pois: POI[], config:
   const bgColor = resolved.backgroundColor;
 
   // Spacing: inner padding + vertical pitch, both user-controlled
-  const pad = Math.max(0, resolved.padding);
+  const padTop = Math.max(0, resolved.paddingTop);
+  const padRight = Math.max(0, resolved.paddingRight);
+  const padBottom = Math.max(0, resolved.paddingBottom);
+  const padLeft = Math.max(0, resolved.paddingLeft);
   const lineH = Math.max(1.2, resolved.lineHeight);
+  const colGap = resolved.columnGap; // mm
 
   // Tile background + border
   const [bgr, bgg, bgb] = hexToRgb(bgColor);
@@ -341,19 +348,25 @@ function drawIndexContentPdf(doc: jsPDF, page: PrintLayout, pois: POI[], config:
       size: resolved.titleFontSize,
       weight: resolved.titleFontWeight,
     });
+    const titlePad = resolved.titlePadding;
     const [ttr, ttg, ttb] = hexToRgb(resolved.titleTextColor);
     doc.setTextColor(ttr, ttg, ttb);
     doc.setFont(tf.family, tf.style);
     doc.setFontSize(tf.sizeMm * MM_TO_PT);
-    doc.text(title.toUpperCase(), pos.x + 2.5, pos.y + titleH - 1.8);
+    doc.text(title.toUpperCase(), pos.x + titlePad, pos.y + titleH - 1.8);
   }
 
-  const bodyX = pos.x + pad;
-  const bodyW = pos.width - pad * 2;
-  const bodyTop = pos.y + titleH + pad * 0.7;
-  const bodyBottom = pos.y + pos.height - pad;
+  const bodyX = pos.x + padLeft;
+  const bodyW = pos.width - padLeft - padRight;
+  const bodyTop = pos.y + titleH + padTop;
+  const bodyBottom = pos.y + pos.height - padBottom;
 
-  const colWidth = bodyW / Math.max(1, columns.length);
+  // Column widths: use relative weights if provided, otherwise equal distribution
+  const colWeights = columns.length > 0 && resolved.columnWidths.length >= columns.length
+    ? resolved.columnWidths.slice(0, columns.length)
+    : columns.map(() => 1);
+  const totalWeight = colWeights.reduce((s, w) => s + w, 0) || 1;
+  const colWidths = colWeights.map((w) => (w / totalWeight) * bodyW);
 
   // Clip to the tile so long names / many rows can never spill out. When the
   // tile has rounded corners, clip to the rounded-rect path (the bottom corners
@@ -368,8 +381,8 @@ function drawIndexContentPdf(doc: jsPDF, page: PrintLayout, pois: POI[], config:
   doc.discardPath();
 
   columns.forEach((col, ci) => {
-    const x0 = bodyX + ci * colWidth;
-    const colRight = x0 + colWidth;
+    const x0 = bodyX + colWidths.slice(0, ci).reduce((s, w) => s + w, 0) + ci * colGap;
+    const colRight = x0 + colWidths[ci];
     let y = bodyTop;
 
     for (const group of col) {
@@ -378,30 +391,41 @@ function drawIndexContentPdf(doc: jsPDF, page: PrintLayout, pois: POI[], config:
         const iconSize = resolved.categoryFontSize * 1.5;
         const iconGap = resolved.showIcons ? iconSize + 0.8 : 0;
         if (resolved.showIcons) {
-          drawIndexIcon(doc, indexIconFor(group.category), x0, y - iconSize + resolved.categoryFontSize * 0.8, iconSize, [r, g, b]);
+          const iconColor = resolved.categorySeparatorStyle !== 'none'
+            ? hexToRgb(resolved.categorySeparatorColor)
+            : [r, g, b] as [number, number, number];
+          drawIndexIcon(doc, indexIconFor(group.category), x0, y - iconSize + resolved.categoryFontSize * 0.8, iconSize, iconColor);
         }
         doc.setFont(catFontFamily, catFontStyle);
         doc.setFontSize(catFontSize);
         doc.setTextColor(catCr, catCg, catCb);
         doc.text(catText, x0 + iconGap, y);
         y += lineH * 0.35;
-        if (resolved.showCategoryUnderline) {
-          doc.setDrawColor(r, g, b);
-          doc.setLineWidth(0.2);
+        if (resolved.categorySeparatorStyle === 'underline' || resolved.categorySeparatorStyle === 'line') {
+          const [sr, sg, sb] = hexToRgb(resolved.categorySeparatorColor);
+          doc.setDrawColor(sr, sg, sb);
+          doc.setLineWidth(resolved.categorySeparatorWidth / 3);
           doc.line(x0, y, colRight, y);
         }
         y += lineH * 0.5;
       }
 
       for (const poi of group.items) {
-        const num = `${poi.customNumber}.`;
-        doc.setFont(bodyFontFamily, 'bold');
-        doc.setFontSize(bodyFontSize);
-        doc.setTextColor(r, g, b);
-        doc.text(num, x0, y);
-        const numW = doc.getTextWidth(num);
+        const numText = resolved.numberFormat === 'paren'
+          ? `(${poi.customNumber}).`
+          : resolved.numberFormat === 'dot'
+            ? `${poi.customNumber}.`
+            : resolved.numberFormat === 'dash'
+              ? `- ${poi.customNumber}.`
+              : `${poi.customNumber}.`;
 
-        const ref = refs[poi.id];
+        doc.setFont(numFontFamily, 'bold');
+        doc.setFontSize(numFontSize);
+        doc.setTextColor(numCr, numCg, numCb);
+        doc.text(numText, x0, y);
+        const numW = doc.getTextWidth(numText);
+
+        const ref = resolved.showGridRefs ? (refs[poi.id] ?? null) : null;
         let refW = 0;
         if (ref) {
           doc.setFont(bodyFontFamily, 'normal');
@@ -411,7 +435,7 @@ function drawIndexContentPdf(doc: jsPDF, page: PrintLayout, pois: POI[], config:
 
         const gap = 1;
         const nameX = x0 + numW + gap;
-        const nameMaxW = Math.max(3, colWidth - (numW + gap) - (ref ? refW + 2 : 0));
+        const nameMaxW = Math.max(3, colWidths[ci] - (numW + gap) - (ref ? refW + 2 : 0));
 
         doc.setFont(bodyFontFamily, bodyFontStyle);
         doc.setFontSize(bodyFontSize);
@@ -681,7 +705,7 @@ function drawViewportPdf(doc: jsPDF, page: PrintLayout, vp: MapViewport, img?: s
   // The map body is inset by the frame border on all sides, exactly like the
   // layout tile inside the frame's border-box → the map edges + rounded corners
   // match the on-screen layout. Title bar is inset by the border too.
-  const border = vp.borderWidth ?? 1;
+  const border = vp.borderWidth ?? 0.1;
   const body = mapBodyBox(vp, page.itemSpacing ?? 0);
   const tx = bx + border;
   const ty = by + border;
@@ -698,7 +722,7 @@ function drawViewportPdf(doc: jsPDF, page: PrintLayout, vp: MapViewport, img?: s
   // Title bar (stays horizontal; the map content rotates beneath it via bearing)
   if (title) {
     const withBg = vp.titleBackground !== false;
-    const tbg = withBg ? (vp.titleBackgroundColor || page.defaultTitleBackgroundColor || page.spotColor) : '#fafafa';
+    const tbg = withBg ? (vp.titleBackgroundColor || page.defaultTitleBackgroundColor || '#ffffff') : '#fafafa';
     const [tr, tg, tb] = hexToRgb(tbg);
     doc.setFillColor(tr, tg, tb);
     if (radius > 0) {
@@ -756,7 +780,7 @@ function drawViewportPdf(doc: jsPDF, page: PrintLayout, vp: MapViewport, img?: s
   // Frame border
   const [br, bg, bb] = hexToRgb(vp.borderColor || '#000000');
   doc.setDrawColor(br, bg, bb);
-  doc.setLineWidth((vp.borderWidth ?? 1) / 3);
+  doc.setLineWidth((vp.borderWidth ?? 0.1) / 3);
   doc.roundedRect(bx, by, bw, bh, radius, radius, 'S');
 }
 

@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { GridLayout, LayoutItem } from 'react-grid-layout';
-import { noOverlapCompactor } from 'react-grid-layout/core';
+import { noOverlapCompactor, createScaledStrategy } from 'react-grid-layout/core';
 import { MapViewport, PrintLayout, PrintPage, IndexListConfig, TitleBlockConfig } from '@/types';
 import { PrintMapFrame } from './PrintMapFrame';
 import { IndexListFrameWrapper } from './IndexListFrameWrapper';
@@ -530,7 +530,12 @@ export function LayoutCanvas({
 
         {/* Inspector */}
         {showInspector && (
-          <aside className="flex min-h-0 w-80 shrink-0 flex-col border-l border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+          <aside className="
+            flex min-h-0 w-80 shrink-0 flex-col border-l border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950
+            fixed md:relative bottom-0 left-0 right-0 md:bottom-auto md:left-auto md:right-auto
+            h-[50vh] md:h-auto max-h-[50vh] md:max-h-none
+            border-t md:border-t-0 border-l-0 md:border-l z-30 md:z-auto
+          ">
             <div className="flex items-center justify-between border-b border-zinc-200 px-3 py-2 dark:border-zinc-800">
               <span className="flex items-center gap-1.5 text-xs font-semibold text-zinc-700 dark:text-zinc-200">
                 <PanelRight className="h-3.5 w-3.5" />
@@ -686,6 +691,20 @@ function PageCanvas({
     return makeGuideSnapConstraint(gx, gy, tolX, tolY);
   }, [margins, foldColMm, foldRowMm, page.snapToFold]);
 
+  const scaledPositionStrategy = useMemo(() => {
+    const base = createScaledStrategy(zoom);
+    return {
+      type: 'transform' as const,
+      scale: zoom,
+      calcStyle: base.calcStyle,
+      // Intentionally omit calcDragPosition so react-grid-layout uses its
+      // built-in non-strategy path which correctly computes the tile's position
+      // as (clientRect.left - parentRect.left) / transformScale. The library's
+      // own createScaledStrategy.calcDragPosition returns the absolute viewport
+      // position instead of the position relative to the container.
+    };
+  }, [zoom]);
+
   // itemSpacing is symmetric padding around each tile: pad on each side, so a
   // gutter of itemSpacing separates neighbouring frames while tile boxes stay
   // on the fold grid (fold lines run through the blank gutter).
@@ -767,6 +786,7 @@ function PageCanvas({
   const prevSigRef = useRef<string>('');
 
   useEffect(() => {
+    if (skipSyncRef.current) { skipSyncRef.current = false; return; }
     if (prevSigRef.current === sig) return;
     prevSigRef.current = sig;
     const items: GridItem[] = page.viewports.map(viewportToItem);
@@ -818,23 +838,47 @@ function PageCanvas({
     [page.id, page.indexLists, page.titleBlocks, page.viewports, onPageIndexUpdate, onPageTitleBlockUpdate, onPageViewportUpdate, gridToMm, gridWToMm, gridHToMm]
   );
 
+  const skipSyncRef = useRef(false);
+
   const handleLayoutChange = useCallback(
     (newLayout: readonly LayoutItem[]) => {
-      newLayout.forEach((item) => persistGridItem(item));
+      // Keep gridItems in sync with react-grid-layout's internal layout
+      // (compaction, etc.) WITHOUT persisting to mm — that only happens on
+      // drag/resize stop to avoid mm-roundtrip rounding drift.
+      skipSyncRef.current = true;
+      setGridItems((prev) => newLayout.map((l) => {
+        const existing = prev.find((p) => p.i === l.i);
+        return existing ? { ...existing, x: l.x, y: l.y, w: l.w, h: l.h } : l as GridItem;
+      }));
     },
-    [persistGridItem]
+    []
   );
 
   const handleDragStop = useCallback(
-    (_layout: readonly LayoutItem[], _oldItem: LayoutItem | null, newItem: LayoutItem | null) => {
-      if (newItem) persistGridItem(newItem);
+    (layout: readonly LayoutItem[], _oldItem: LayoutItem | null, newItem: LayoutItem | null) => {
+      if (newItem) {
+        // Apply the final grid positions directly to avoid mm-roundtrip drift
+        skipSyncRef.current = true;
+        setGridItems((prev) => layout.map((l) => {
+          const existing = prev.find((p) => p.i === l.i);
+          return existing ? { ...existing, x: l.x, y: l.y, w: l.w, h: l.h } : l as GridItem;
+        }));
+        persistGridItem(newItem);
+      }
     },
     [persistGridItem]
   );
 
   const handleResizeStop = useCallback(
-    (_layout: readonly LayoutItem[], _oldItem: LayoutItem | null, newItem: LayoutItem | null) => {
-      if (newItem) persistGridItem(newItem);
+    (layout: readonly LayoutItem[], _oldItem: LayoutItem | null, newItem: LayoutItem | null) => {
+      if (newItem) {
+        skipSyncRef.current = true;
+        setGridItems((prev) => layout.map((l) => {
+          const existing = prev.find((p) => p.i === l.i);
+          return existing ? { ...existing, x: l.x, y: l.y, w: l.w, h: l.h } : l as GridItem;
+        }));
+        persistGridItem(newItem);
+      }
     },
     [persistGridItem]
   );
@@ -907,6 +951,7 @@ function PageCanvas({
           className="layout"
           layout={gridItems}
           width={containerWidth}
+          positionStrategy={scaledPositionStrategy}
           gridConfig={{
             cols: GRID_FINE,
             rowHeight: (pageSize.h / GRID_FINE) * CSS_PX_PER_MM,
@@ -916,7 +961,7 @@ function PageCanvas({
           constraints={[guideConstraint]}
           compactor={noOverlapCompactor}
           resizeConfig={{ handles: ['se', 'sw', 'ne', 'nw'] }}
-          dragConfig={{ handle: '.frame-drag-handle', threshold: 8 }}
+          dragConfig={{ handle: '.frame-drag-handle' }}
           onDragStop={handleDragStop}
           onResizeStop={handleResizeStop}
           onLayoutChange={handleLayoutChange}
@@ -931,7 +976,7 @@ function PageCanvas({
               const boxPx = insetBoxPx(item);
               const contentPx = contentDims(config.rotation, boxPx.w, boxPx.h);
               return (
-                <div key={item.i} className={cn('relative')} style={{ zIndex: isActiveItem ? 10 : 2 }}>
+                <div key={item.i} className={cn('relative')} style={{ zIndex: isActiveItem ? 1000 + (config.stackOrder ?? 0) : 10 + (config.stackOrder ?? 0) }}>
                   <div className="relative h-full w-full">
                     <div className="absolute" style={{ top: padPx, left: padPx, right: padPx, bottom: padPx }}>
                       <IndexListFrameWrapper
@@ -965,7 +1010,7 @@ function PageCanvas({
               const boxPx = insetBoxPx(item);
               const contentPx = contentDims(config.rotation, boxPx.w, boxPx.h);
               return (
-                <div key={item.i} className={cn('relative')} style={{ zIndex: isActiveItem ? 10 : 2 }}>
+                <div key={item.i} className={cn('relative')} style={{ zIndex: isActiveItem ? 1000 + (config.stackOrder ?? 0) : 10 + (config.stackOrder ?? 0) }}>
                   <div className="relative h-full w-full">
                     <div className="absolute" style={{ top: padPx, left: padPx, right: padPx, bottom: padPx }}>
                       <TitleBlockFrame
@@ -998,8 +1043,8 @@ function PageCanvas({
             return (
               <div
                 key={item.i}
-                className={cn('relative', isActiveItem && 'ring-2 ring-blue-500 z-10')}
-                style={{ zIndex: isActiveItem ? 10 : 1 }}
+                className={cn('relative', isActiveItem && 'ring-2 ring-blue-500')}
+                style={{ zIndex: isActiveItem ? 1000 + (vp.stackOrder ?? 0) : 10 + (vp.stackOrder ?? 0) }}
               >
                 <div className="relative h-full w-full">
                   <div className="absolute" style={{ top: padPx, left: padPx, right: padPx, bottom: padPx }}>
@@ -1380,9 +1425,20 @@ function PageSettings({ page, onUpdate }: { page: PrintLayout; onUpdate: (u: Par
         </Field>
       </div>
       <div className="grid grid-cols-2 gap-2">
-        <Field label="Default padding (mm)">
-          <Num value={page.indexListPadding ?? 1.5} onChange={(v) => onUpdate({ indexListPadding: v })} min={0} max={20} step={0.5} />
+        <Field label="Padding top (mm)">
+          <Num value={page.indexListPaddingTop ?? page.indexListPadding ?? 1.5} onChange={(v) => onUpdate({ indexListPaddingTop: v })} min={0} max={20} step={0.5} />
         </Field>
+        <Field label="Padding right (mm)">
+          <Num value={page.indexListPaddingRight ?? page.indexListPadding ?? 1.5} onChange={(v) => onUpdate({ indexListPaddingRight: v })} min={0} max={20} step={0.5} />
+        </Field>
+        <Field label="Padding bottom (mm)">
+          <Num value={page.indexListPaddingBottom ?? page.indexListPadding ?? 1.5} onChange={(v) => onUpdate({ indexListPaddingBottom: v })} min={0} max={20} step={0.5} />
+        </Field>
+        <Field label="Padding left (mm)">
+          <Num value={page.indexListPaddingLeft ?? page.indexListPadding ?? 1.5} onChange={(v) => onUpdate({ indexListPaddingLeft: v })} min={0} max={20} step={0.5} />
+        </Field>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
         <Field label="Default line height (mm)">
           <Num value={page.indexListLineHeight ?? 3.6} onChange={(v) => onUpdate({ indexListLineHeight: v })} min={1.2} max={12} step={0.2} />
         </Field>
@@ -1395,6 +1451,10 @@ function PageSettings({ page, onUpdate }: { page: PrintLayout; onUpdate: (u: Par
         <Label className="flex items-center gap-2 cursor-pointer text-xs">
           <Switch checked={page.indexListRoundedCorners === true} onCheckedChange={(c) => onUpdate({ indexListRoundedCorners: c })} />
           Rounded corners
+        </Label>
+        <Label className="flex items-center gap-2 cursor-pointer text-xs">
+          <Switch checked={page.indexListShowGridRefs !== false} onCheckedChange={(c) => onUpdate({ indexListShowGridRefs: c })} />
+          Grid references
         </Label>
       </div>
     </>
@@ -1428,7 +1488,7 @@ function ViewportProperties({ viewport, page, onUpdate }: {
             <Num value={viewport.cornerRadius ?? 4} onChange={(v) => onUpdate(viewport.id, { cornerRadius: v })} min={0} />
           </Field>
           <Field label="Border width (mm)">
-            <Num value={viewport.borderWidth ?? 1} onChange={(v) => onUpdate(viewport.id, { borderWidth: v })} min={0} step={0.5} />
+            <Num value={viewport.borderWidth ?? 0.1} onChange={(v) => onUpdate(viewport.id, { borderWidth: v })} min={0} step={0.1} />
           </Field>
           <Field label="Border color">
             <ColorPicker color={viewport.borderColor || '#000000'} onChange={(c) => onUpdate(viewport.id, { borderColor: c })} />
@@ -1446,7 +1506,7 @@ function ViewportProperties({ viewport, page, onUpdate }: {
       <SubSection title="Title bar">
         <div className="grid grid-cols-2 gap-2">
           <Field label="Background color">
-            <ColorPicker color={viewport.titleBackgroundColor || page.spotColor} onChange={(c) => onUpdate(viewport.id, { titleBackgroundColor: c })} />
+            <ColorPicker color={viewport.titleBackgroundColor || '#ffffff'} onChange={(c) => onUpdate(viewport.id, { titleBackgroundColor: c })} />
           </Field>
           <Field label="Text color">
             <ColorPicker
@@ -1484,6 +1544,14 @@ function ViewportProperties({ viewport, page, onUpdate }: {
         <Label className="flex items-center gap-2 cursor-pointer text-xs">
           <Switch checked={viewport.showGridIndicator !== false} onCheckedChange={(c) => onUpdate(viewport.id, { showGridIndicator: c })} />
           Grid size indicator
+        </Label>
+        <Label className="flex items-center gap-2 cursor-pointer text-xs">
+          <Switch checked={viewport.showScaleBar ?? true} onCheckedChange={(c) => onUpdate(viewport.id, { showScaleBar: c })} />
+          Scale bar
+        </Label>
+        <Label className="flex items-center gap-2 cursor-pointer text-xs">
+          <Switch checked={viewport.showScaleText ?? true} onCheckedChange={(c) => onUpdate(viewport.id, { showScaleText: c })} />
+          Scale text (1:N)
         </Label>
         <Field label="Spacing">
           <select
@@ -1861,6 +1929,52 @@ function IndexListProperties({ page, config, onUpdate }: {
 
       </SubSection>
 
+      <SubSection title="Layout">
+        <div className="grid grid-cols-2 gap-2">
+          <Field label="Text align">
+            <select value={resolved.textAlign} onChange={(e) => onUpdate({ textAlign: e.target.value as IndexListConfig['textAlign'] })} className="h-8 w-full rounded-lg border border-input bg-background px-2 text-sm">
+              <option value="left">Left</option>
+              <option value="center">Center</option>
+              <option value="right">Right</option>
+            </select>
+          </Field>
+          <Field label="Column gap (mm)">
+            <Num value={resolved.columnGap} onChange={(v) => onUpdate({ columnGap: v })} min={0} max={20} step={0.5} />
+          </Field>
+          <Field label="Max height (mm)">
+            <Num value={resolved.maxHeight} onChange={(v) => onUpdate({ maxHeight: v })} min={0} max={500} step={1} />
+          </Field>
+          <Field label="Overflow">
+            <select value={resolved.overflow} onChange={(e) => onUpdate({ overflow: e.target.value as IndexListConfig['overflow'] })} className="h-8 w-full rounded-lg border border-input bg-background px-2 text-sm">
+              <option value="clip">Clip</option>
+              <option value="ellipsis">Ellipsis</option>
+              <option value="page">Page</option>
+            </select>
+          </Field>
+        </div>
+        {resolved.columns > 1 && (
+          <Field label={`Column widths (${resolved.columns} cols)`}>
+            <div className="flex gap-1">
+              {Array.from({ length: resolved.columns }, (_, i) => (
+                <Num
+                  key={i}
+                  value={resolved.columnWidths[i] ?? 1}
+                  onChange={(v) => {
+                    const widths = [...resolved.columnWidths];
+                    while (widths.length <= i) widths.push(1);
+                    widths[i] = v;
+                    onUpdate({ columnWidths: widths });
+                  }}
+                  min={0.1}
+                  max={10}
+                  step={0.5}
+                />
+              ))}
+            </div>
+          </Field>
+        )}
+      </SubSection>
+
       <SubSection title="Style">
         <div className="grid grid-cols-2 gap-2">
           <Field label="Corner radius (mm)">
@@ -1878,6 +1992,28 @@ function IndexListProperties({ page, config, onUpdate }: {
         <Field label="Title background">
           <ColorPicker color={resolved.titleBackgroundColor} onChange={(c) => onUpdate({ titleBackgroundColor: c })} />
         </Field>
+        <Field label="Title text">
+          <ColorPicker color={resolved.titleTextColor} onChange={(c) => onUpdate({ titleTextColor: c })} />
+        </Field>
+        <Field label="Icon size (mm)">
+          <Num value={resolved.iconSize} onChange={(v) => onUpdate({ iconSize: v })} min={1} max={10} step={0.5} />
+        </Field>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <Label className="flex items-center gap-2 cursor-pointer text-xs col-span-2">
+          <Switch checked={resolved.showTitleBorder} onCheckedChange={(c) => onUpdate({ showTitleBorder: c })} />
+          Title bar border
+        </Label>
+        {resolved.showTitleBorder && (
+          <>
+            <Field label="Title border width (mm)">
+              <Num value={resolved.titleBorderWidth} onChange={(v) => onUpdate({ titleBorderWidth: v })} min={0} step={0.1} />
+            </Field>
+            <Field label="Title border color">
+              <ColorPicker color={resolved.titleBorderColor} onChange={(c) => onUpdate({ titleBorderColor: c })} />
+            </Field>
+          </>
+        )}
       </div>
       <div className="grid grid-cols-2 gap-2">
         <Label className="flex items-center gap-2 cursor-pointer text-xs">
@@ -1892,13 +2028,22 @@ function IndexListProperties({ page, config, onUpdate }: {
           <Switch checked={resolved.roundedCorners} onCheckedChange={(c) => onUpdate({ roundedCorners: c })} />
           Rounded corners
         </Label>
+        <Label className="flex items-center gap-2 cursor-pointer text-xs">
+          <Switch checked={resolved.showGridRefs} onCheckedChange={(c) => onUpdate({ showGridRefs: c })} />
+          Grid references
+        </Label>
       </div>
       </SubSection>
 
       <SubSection title="Title bar">
-        <Field label="Text color">
-          <ColorPicker color={resolved.titleTextColor} onChange={(c) => onUpdate({ titleTextColor: c })} />
-        </Field>
+        <div className="grid grid-cols-2 gap-2">
+          <Field label="Text color">
+            <ColorPicker color={resolved.titleTextColor} onChange={(c) => onUpdate({ titleTextColor: c })} />
+          </Field>
+          <Field label="Padding (mm)">
+            <Num value={resolved.titlePadding} onChange={(v) => onUpdate({ titlePadding: v })} min={0} max={10} step={0.5} />
+          </Field>
+        </div>
         <FontGroup
           family={resolved.titleFontFamily}
           size={resolved.titleFontSize}
@@ -1927,23 +2072,72 @@ function IndexListProperties({ page, config, onUpdate }: {
         sizeStep={0.2}
       />
       <div className="grid grid-cols-2 gap-2">
-        <Field label="Padding (mm)">
-          <Num value={resolved.padding} onChange={(v) => onUpdate({ padding: v })} min={0} max={20} step={0.5} />
+        <Field label="Top (mm)">
+          <Num value={resolved.paddingTop} onChange={(v) => onUpdate({ paddingTop: v })} min={0} max={20} step={0.5} />
         </Field>
-        <Field label="Line height (mm)">
-          <Num value={resolved.lineHeight} onChange={(v) => onUpdate({ lineHeight: v })} min={1.2} max={12} step={0.2} />
+        <Field label="Right (mm)">
+          <Num value={resolved.paddingRight} onChange={(v) => onUpdate({ paddingRight: v })} min={0} max={20} step={0.5} />
+        </Field>
+        <Field label="Bottom (mm)">
+          <Num value={resolved.paddingBottom} onChange={(v) => onUpdate({ paddingBottom: v })} min={0} max={20} step={0.5} />
+        </Field>
+        <Field label="Left (mm)">
+          <Num value={resolved.paddingLeft} onChange={(v) => onUpdate({ paddingLeft: v })} min={0} max={20} step={0.5} />
         </Field>
       </div>
+      <Field label="Line height (mm)">
+        <Num value={resolved.lineHeight} onChange={(v) => onUpdate({ lineHeight: v })} min={1.2} max={12} step={0.2} />
+      </Field>
+      </SubSection>
+
+      <SubSection title="Number format">
+        <div className="grid grid-cols-2 gap-2">
+          <Field label="Format">
+            <select value={resolved.numberFormat} onChange={(e) => onUpdate({ numberFormat: e.target.value as IndexListConfig['numberFormat'] })} className="h-8 w-full rounded-lg border border-input bg-background px-2 text-sm">
+              <option value="number">1</option>
+              <option value="paren">(1)</option>
+              <option value="dot">1.</option>
+              <option value="dash">- 1</option>
+            </select>
+          </Field>
+        </div>
+        <FontGroup
+          family={resolved.numberFontFamily}
+          size={resolved.numberFontSize}
+          weight={resolved.numberFontWeight}
+          onFamily={(v) => onUpdate({ numberFontFamily: v })}
+          onSize={(v) => onUpdate({ numberFontSize: v })}
+          onWeight={(v) => onUpdate({ numberFontWeight: v })}
+          onReset={() => onUpdate({ numberFontFamily: undefined, numberFontSize: undefined, numberFontWeight: undefined })}
+          sizeMin={1}
+          sizeMax={8}
+          sizeStep={0.2}
+        />
       </SubSection>
 
       <SubSection title="Category headers">
-        <Field label="Header color">
-          <ColorPicker color={resolved.categoryColor} onChange={(c) => onUpdate({ categoryColor: c })} />
-        </Field>
-        <Label className="flex items-center gap-2 cursor-pointer text-xs">
-          <Switch checked={resolved.showCategoryUnderline} onCheckedChange={(c) => onUpdate({ showCategoryUnderline: c })} />
-          Header underline
-        </Label>
+        <div className="grid grid-cols-2 gap-2">
+          <Field label="Header color">
+            <ColorPicker color={resolved.categoryColor} onChange={(c) => onUpdate({ categoryColor: c })} />
+          </Field>
+          <Field label="Separator style">
+            <select value={resolved.categorySeparatorStyle} onChange={(e) => onUpdate({ categorySeparatorStyle: e.target.value as IndexListConfig['categorySeparatorStyle'] })} className="h-8 w-full rounded-lg border border-input bg-background px-2 text-sm">
+              <option value="none">None</option>
+              <option value="underline">Underline</option>
+              <option value="line">Full line</option>
+            </select>
+          </Field>
+          {resolved.categorySeparatorStyle !== 'none' && (
+            <>
+              <Field label="Separator color">
+                <ColorPicker color={resolved.categorySeparatorColor} onChange={(c) => onUpdate({ categorySeparatorColor: c })} />
+              </Field>
+              <Field label="Separator width (mm)">
+                <Num value={resolved.categorySeparatorWidth} onChange={(v) => onUpdate({ categorySeparatorWidth: v })} min={0.1} max={2} step={0.1} />
+              </Field>
+            </>
+          )}
+        </div>
       <FontGroup
         family={resolved.categoryFontFamily}
         size={resolved.categoryFontSize}
@@ -1956,6 +2150,22 @@ function IndexListProperties({ page, config, onUpdate }: {
         sizeMax={8}
         sizeStep={0.2}
       />
+      </SubSection>
+
+      <SubSection title="Stacking">
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => onUpdate({ stackOrder: (config.stackOrder ?? 0) + 1 })}>
+            Bring Forward
+          </Button>
+          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => onUpdate({ stackOrder: (config.stackOrder ?? 0) - 1 })}>
+            Send Backward
+          </Button>
+          {(config.stackOrder ?? 0) !== 0 && (
+            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => onUpdate({ stackOrder: undefined })}>
+              Reset
+            </Button>
+          )}
+        </div>
       </SubSection>
     </>
   );
@@ -2016,8 +2226,24 @@ function TitleBlockProperties({ page, config, onUpdate }: {
             <ColorPicker color={config.borderColor ?? page.spotColor} onChange={(c) => onUpdate({ borderColor: c })} />
           </Field>
           <Field label="Border width (mm)">
-            <Num value={config.borderWidth ?? 0} onChange={(v) => onUpdate({ borderWidth: v })} min={0} step={0.5} />
+            <Num value={config.borderWidth ?? 0.1} onChange={(v) => onUpdate({ borderWidth: v })} min={0} step={0.5} />
           </Field>
+        </div>
+      </SubSection>
+
+      <SubSection title="Stacking">
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => onUpdate({ stackOrder: (config.stackOrder ?? 0) + 1 })}>
+            Bring Forward
+          </Button>
+          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => onUpdate({ stackOrder: (config.stackOrder ?? 0) - 1 })}>
+            Send Backward
+          </Button>
+          {(config.stackOrder ?? 0) !== 0 && (
+            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => onUpdate({ stackOrder: undefined })}>
+              Reset
+            </Button>
+          )}
         </div>
       </SubSection>
     </>

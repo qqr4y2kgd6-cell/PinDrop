@@ -23,9 +23,9 @@ export function CanvasArea() {
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'layout' | 'map')} className="flex-1 flex flex-col">
-        <TabsList className="border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-4">
-          <TabsTrigger value="layout">Print Layout</TabsTrigger>
-          <TabsTrigger value="map">Map Editor</TabsTrigger>
+        <TabsList className="border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-4 md:px-4 px-14">
+          <TabsTrigger value="layout" className="text-xs md:text-sm px-3 md:px-4">Print Layout</TabsTrigger>
+          <TabsTrigger value="map" className="text-xs md:text-sm px-3 md:px-4">Map Editor</TabsTrigger>
         </TabsList>
         <TabsContent value="layout" className="flex-1 flex flex-col overflow-hidden">
           <LayoutCanvas

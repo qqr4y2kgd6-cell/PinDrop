@@ -465,6 +465,180 @@ export function removePoiLayer(map: MapLibreMap) {
   if (map.getSource(POI_LEG_SOURCE)) map.removeSource(POI_LEG_SOURCE);
 }
 
+// --- Enhanced map layers ---
+
+const CONTOUR_SOURCE = 'contour-terrarium';
+const SATELLITE_SOURCE = 'satellite-eox';
+
+/** Ensures the openmaptiles-based overlay layers exist (transit, trails, admin labels). */
+function ensureOverlayLayers(map: MapLibreMap) {
+  // Transit stops (from OpenMapTiles poi layer)
+  if (!map.getLayer('transit-stop')) {
+    map.addLayer({
+      id: 'transit-stop',
+      type: 'circle',
+      source: 'openmaptiles',
+      'source-layer': 'poi',
+      filter: ['match', ['get', 'class'], ['bus', 'rail', 'tram', 'subway'], true, false] as FilterSpecification,
+      paint: {
+        'circle-radius': 0,
+        'circle-opacity': 0,
+        'circle-color': '#d32f2f',
+      },
+    });
+  }
+
+  // Trails / hiking paths (from transportation layer)
+  if (!map.getLayer('trail')) {
+    map.addLayer({
+      id: 'trail',
+      type: 'line',
+      source: 'openmaptiles',
+      'source-layer': 'transportation',
+      filter: ['match', ['get', 'class'], ['path', 'track', 'trail'], true, false] as FilterSpecification,
+      paint: {
+        'line-color': '#8B4513',
+        'line-width': 0.3,
+        'line-dasharray': [4, 2],
+        'line-opacity': 0,
+      },
+    }, 'poi-legs');
+  }
+
+  // Admin boundary labels (place labels at admin level)
+  if (!map.getLayer('admin-label')) {
+    map.addLayer({
+      id: 'admin-label',
+      type: 'symbol',
+      source: 'openmaptiles',
+      'source-layer': 'place',
+      filter: ['match', ['get', 'class'], ['region', 'continent'], true, false] as FilterSpecification,
+      layout: {
+        'text-field': ['coalesce', ['get', 'name:en'], ['get', 'name:latin'], ['get', 'name']],
+        'text-font': ['Noto Sans Regular'],
+        'text-size': 0,
+        'text-transform': 'uppercase',
+      },
+      paint: {
+        'text-color': '#888888',
+        'text-halo-color': '#ffffff',
+        'text-halo-width': 0.5,
+        'text-opacity': 0,
+      },
+    });
+  }
+}
+
+/** Applies the per-viewport layer overrides for enhanced layers. */
+export function applyEnhancedLayerStyle(map: MapLibreMap, l: Required<MapLayerStyle>) {
+  // Ensure openmaptiles overlay layers exist
+  ensureOverlayLayers(map);
+
+  // --- Contour lines (raster-dem source + hillshade + contour-line layers) ---
+  if (l.showContourLines) {
+    // Add DEM source on demand
+    if (!map.getSource(CONTOUR_SOURCE)) {
+      try {
+        map.addSource(CONTOUR_SOURCE, {
+          type: 'raster-dem',
+          tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],
+          encoding: 'terrarium',
+          tileSize: 256,
+          maxzoom: 14,
+        });
+      } catch { /* source already exists or invalid */ }
+    }
+    if (!map.getLayer('hillshade')) {
+      map.addLayer({
+        id: 'hillshade',
+        type: 'hillshade',
+        source: CONTOUR_SOURCE,
+        paint: {
+          'hillshade-illumination-direction': 315,
+          'hillshade-exaggeration': 0.3,
+          'hillshade-highlight-color': '#ffffff',
+          'hillshade-shadow-color': '#000000',
+        },
+      }, 'poi-legs');
+    }
+    if (!map.getLayer('contour-lines')) {
+      map.addLayer({
+        id: 'contour-lines',
+        type: 'line',
+        source: CONTOUR_SOURCE,
+        paint: {
+          'line-color': l.contourLineColor,
+          'line-width': l.contourLineWidth,
+        },
+      }, 'hillshade');
+    }
+    map.setPaintProperty('contour-lines', 'line-color', l.contourLineColor);
+    map.setPaintProperty('contour-lines', 'line-width', l.contourLineWidth);
+  } else {
+    setLayerVisibility(map, ['hillshade', 'contour-lines'], false);
+  }
+
+  // --- Satellite overlay (raster source + layer) ---
+  if (l.showSatellite) {
+    if (!map.getSource(SATELLITE_SOURCE)) {
+      try {
+        map.addSource(SATELLITE_SOURCE, {
+          type: 'raster',
+          tiles: ['https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2020_3857/default/g/{z}/{y}/{x}.jpg'],
+          tileSize: 256,
+          maxzoom: 18,
+        });
+      } catch { /* source already exists or invalid */ }
+    }
+    if (!map.getLayer('satellite')) {
+      map.addLayer({
+        id: 'satellite',
+        type: 'raster',
+        source: SATELLITE_SOURCE,
+        paint: { 'raster-opacity': l.satelliteOpacity },
+      }, 'park');
+    } else {
+      map.setLayoutProperty('satellite', 'visibility', 'visible');
+      map.setPaintProperty('satellite', 'raster-opacity', l.satelliteOpacity);
+    }
+  } else {
+    setLayerVisibility(map, ['satellite'], false);
+  }
+
+  // Transit stops
+  if (map.getLayer('transit-stop')) {
+    const visible = l.showTransitStops;
+    map.setLayoutProperty('transit-stop', 'visibility', visible ? 'visible' : 'none');
+    map.setPaintProperty('transit-stop', 'circle-radius', visible ? l.transitStopSize : 0);
+    map.setPaintProperty('transit-stop', 'circle-opacity', visible ? 1 : 0);
+    map.setPaintProperty('transit-stop', 'circle-color', l.transitStopColor);
+  }
+
+  // Trails
+  if (map.getLayer('trail')) {
+    const visible = l.showTrails;
+    map.setLayoutProperty('trail', 'visibility', visible ? 'visible' : 'none');
+    map.setPaintProperty('trail', 'line-color', l.trailColor);
+    map.setPaintProperty('trail', 'line-width', visible ? l.trailWidth : 0);
+    map.setPaintProperty('trail', 'line-dasharray', l.trailDashArray);
+  }
+
+  // Admin boundaries
+  if (map.getLayer('boundary')) {
+    const visible = l.showAdminBoundaries;
+    map.setLayoutProperty('boundary', 'visibility', visible ? 'visible' : 'none');
+    map.setPaintProperty('boundary', 'line-color', l.adminBoundaryColor);
+    map.setPaintProperty('boundary', 'line-width', l.adminBoundaryWidth);
+  }
+
+  // Admin labels
+  if (map.getLayer('admin-label')) {
+    const visible = l.showAdminLabels;
+    map.setLayoutProperty('admin-label', 'visibility', visible ? 'visible' : 'none');
+    map.setPaintProperty('admin-label', 'text-opacity', visible ? 0.8 : 0);
+  }
+}
+
 /** Per-road-class width/opacity multipliers, applied on top of `roadWidth`/`roadOpacity`. */
 const ROAD_SPECS = [
   { id: 'road-major', w: 1.4, o: 1 },
@@ -491,6 +665,29 @@ export const DEFAULT_LAYER_STYLE: Required<MapLayerStyle> = {
   parkOpacity: 1,
   landColor: '#ffffff',
   placeNames: DEFAULT_PLACE_NAMES,
+  // Contour lines
+  showContourLines: false,
+  contourLineColor: '#8B7355',
+  contourLineWidth: 0.5,
+  contourLabelColor: '#000000',
+  contourLabelSize: 2.0,
+  // Satellite overlay
+  showSatellite: false,
+  satelliteOpacity: 0.7,
+  // Transit stops
+  showTransitStops: false,
+  transitStopColor: '#d32f2f',
+  transitStopSize: 3.0,
+  // Trails
+  showTrails: false,
+  trailColor: '#8B4513',
+  trailWidth: 0.3,
+  trailDashArray: [4, 2],
+  // Admin boundaries
+  showAdminBoundaries: true,
+  adminBoundaryColor: '#9a9a9a',
+  adminBoundaryWidth: 0.4,
+  showAdminLabels: false,
 };
 
 function setLayerVisibility(map: MapLibreMap, ids: string[], visible: boolean) {
