@@ -35,7 +35,7 @@ export function PrintMapFrame({ viewport, isActive, onSelect, onRemove, onUpdate
   const titleBackground = viewport.titleBackground !== false;
   const titleBgColor = viewport.titleBackgroundColor || layout.defaultTitleBackgroundColor || '#ffffff';
   const titleTextColor = viewport.titleTextColor || layout.defaultTitleTextColor || (titleBackground ? '#ffffff' : '#1a1a1a');
-  const titleFontSize = Math.max(6, (viewport.titleFontSize ?? layout.titleFontSize ?? 3) * CSS_PX_PER_MM);
+  const titleFontSize = Math.max(2, (viewport.titleFontSize ?? layout.titleFontSize ?? 3) * CSS_PX_PER_MM);
   const titleFontWeight = viewport.titleFontWeight ?? layout.titleFontWeight ?? 'bold';
   // The title bar is a fixed print-height band (TITLE_BAR_MM), matching the
   // export's frame body so a bbox fit shows exactly the same extent in the
@@ -172,11 +172,11 @@ function ScaleBarSVG({ result, color }: { result: ScaleBarResult; color: string 
 
   return (
     <svg
-      width={barWidth + 2}
+      width={barWidth + 6}
       height={totalHeight}
-      viewBox={`0 0 ${barWidth + 2} ${totalHeight}`}
+      viewBox={`0 0 ${barWidth + 6} ${totalHeight}`}
       className="inline-block"
-      style={{ minWidth: barWidth + 2 }}
+      style={{ minWidth: barWidth + 6 }}
     >
       {/* Base line */}
       <line x1={1} y1={labelOffset} x2={1 + barWidth} y2={labelOffset} stroke={color} strokeWidth={0.3} />

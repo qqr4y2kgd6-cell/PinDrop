@@ -23,7 +23,7 @@ const weightCss = (w?: 'normal' | 'medium' | 'bold') => (w === 'bold' ? 700 : w 
 export function TitleBlockFrame({ layout, config, contentPx, isActive, onSelect, onRemove, onRotate }: TitleBlockFrameProps) {
   const rotation = config.rotation ?? 0;
   const fontFamily = config.fontFamily ?? layout.titleFontFamily ?? 'Helvetica';
-  const fontSize = Math.max(6, (config.fontSize ?? layout.titleFontSize ?? 5) * CSS_PX_PER_MM);
+  const fontSize = Math.max(2, (config.fontSize ?? layout.titleFontSize ?? 5) * CSS_PX_PER_MM);
   const fontWeight = config.fontWeight ?? 'bold';
   const textColor = config.textColor ?? '#1a1a1a';
   const backgroundColor = config.backgroundColor ?? '#ffffff';
@@ -69,7 +69,7 @@ export function TitleBlockFrame({ layout, config, contentPx, isActive, onSelect,
           {config.subtitle ? (
             <div
               className="leading-tight"
-              style={{ fontFamily: titleFontCss(fontFamily), fontWeight: 400, fontSize: `${Math.max(6, fontSize * 0.6)}px`, color: textColor, opacity: 0.8, letterSpacing: '0.08em' }}
+              style={{ fontFamily: titleFontCss(fontFamily), fontWeight: 400, fontSize: `${Math.max(1, fontSize * 0.6)}px`, color: textColor, opacity: 0.8, letterSpacing: '0.08em' }}
             >
               {config.subtitle}
             </div>

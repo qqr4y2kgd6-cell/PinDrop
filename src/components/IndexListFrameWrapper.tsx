@@ -28,7 +28,7 @@ export function IndexListFrameWrapper({ layout, config, contentPx, isActive, onS
   const showTitle = resolved.showTitle;
   const title = resolved.title;
   const titleBgColor = resolved.titleBackgroundColor;
-  const titleFontSize = Math.max(6, resolved.titleFontSize * CSS_PX_PER_MM);
+  const titleFontSize = Math.max(2, resolved.titleFontSize * CSS_PX_PER_MM);
   const titleFontWeight = resolved.titleFontWeight;
   const radius = resolved.roundedCorners ? `${resolved.cornerRadius}mm` : '0';
   const borderWidth = `${resolved.borderWidth}mm`;
