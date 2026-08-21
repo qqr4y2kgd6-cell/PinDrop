@@ -637,151 +637,352 @@ export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
 
             <Separator />
 
-            <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 text-xs">
-              <Label className="flex items-center gap-1.5 cursor-pointer">
-                <Switch checked={layer('showRoads')} onCheckedChange={(c) => updateLayers({ showRoads: c })} />
-                <Road className="h-3.5 w-3.5" /> Roads
-              </Label>
-              <Label className="flex items-center gap-1.5 cursor-pointer">
-                <Switch checked={layer('showBuildings')} onCheckedChange={(c) => updateLayers({ showBuildings: c })} />
-                <Building className="h-3.5 w-3.5" /> Buildings
-              </Label>
-              <Label className="flex items-center gap-1.5 cursor-pointer">
-                <Switch checked={layer('showWater')} onCheckedChange={(c) => updateLayers({ showWater: c })} />
-                <Waves className="h-3.5 w-3.5" /> Water
-              </Label>
-              <Label className="flex items-center gap-1.5 cursor-pointer">
-                <Switch checked={layer('showParks')} onCheckedChange={(c) => updateLayers({ showParks: c })} />
-                <TreePine className="h-3.5 w-3.5" /> Parks
-              </Label>
+            {/* Base map */}
+            <div className="flex flex-col gap-3">
+              <div className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Base map</div>
+              <div className="flex flex-col gap-2.5">
+                {/* Roads */}
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="flex items-center gap-1.5 cursor-pointer">
+                      <Switch checked={layer('showRoads')} onCheckedChange={(c) => updateLayers({ showRoads: c })} />
+                      <Road className="h-3.5 w-3.5" /> Roads
+                    </Label>
+                  </div>
+                  {layer('showRoads') && (
+                    <div className="flex flex-col gap-1.5 pl-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-zinc-500 dark:text-zinc-400">Color</span>
+                        <ColorPicker color={layer('roadColor')} onChange={(c) => updateLayers({ roadColor: c })} />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-zinc-500 dark:text-zinc-400">Width</span>
+                        <Select value={String(layer('roadWidth'))} onValueChange={(v) => v && updateLayers({ roadWidth: parseFloat(v) })}>
+                          <SelectTrigger className="text-xs h-7 w-20 px-2">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="0.5">Thin</SelectItem>
+                            <SelectItem value="1">Normal</SelectItem>
+                            <SelectItem value="1.5">Thick</SelectItem>
+                            <SelectItem value="2">Heavy</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-zinc-500 dark:text-zinc-400">Opacity</span>
+                        <Select value={String(layer('roadOpacity'))} onValueChange={(v) => v && updateLayers({ roadOpacity: parseFloat(v) })}>
+                          <SelectTrigger className="text-xs h-7 w-16 px-2">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="0.5">0.5</SelectItem>
+                            <SelectItem value="0.7">0.7</SelectItem>
+                            <SelectItem value="1">1</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Buildings */}
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="flex items-center gap-1.5 cursor-pointer">
+                      <Switch checked={layer('showBuildings')} onCheckedChange={(c) => updateLayers({ showBuildings: c })} />
+                      <Building className="h-3.5 w-3.5" /> Buildings
+                    </Label>
+                  </div>
+                  {layer('showBuildings') && (
+                    <div className="flex flex-col gap-1.5 pl-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-zinc-500 dark:text-zinc-400">Color</span>
+                        <div className="flex items-center gap-1.5">
+                          <ColorPicker color={layer('buildingColor')} onChange={(c) => updateLayers({ buildingColor: c })} />
+                          <ColorPicker color={layer('buildingOutlineColor')} onChange={(c) => updateLayers({ buildingOutlineColor: c })} />
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-zinc-500 dark:text-zinc-400">Opacity</span>
+                        <Select value={String(layer('buildingOpacity'))} onValueChange={(v) => v && updateLayers({ buildingOpacity: parseFloat(v) })}>
+                          <SelectTrigger className="text-xs h-7 w-16 px-2">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="0.3">0.3</SelectItem>
+                            <SelectItem value="0.6">0.6</SelectItem>
+                            <SelectItem value="1">1</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Water */}
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="flex items-center gap-1.5 cursor-pointer">
+                      <Switch checked={layer('showWater')} onCheckedChange={(c) => updateLayers({ showWater: c })} />
+                      <Waves className="h-3.5 w-3.5" /> Water
+                    </Label>
+                  </div>
+                  {layer('showWater') && (
+                    <div className="flex flex-col gap-1.5 pl-1">
+                      {controlRow('Color', layer('waterColor'), (c) => updateLayers({ waterColor: c }), layer('waterOpacity'), (n) => updateLayers({ waterOpacity: n }))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Parks */}
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="flex items-center gap-1.5 cursor-pointer">
+                      <Switch checked={layer('showParks')} onCheckedChange={(c) => updateLayers({ showParks: c })} />
+                      <TreePine className="h-3.5 w-3.5" /> Parks
+                    </Label>
+                  </div>
+                  {layer('showParks') && (
+                    <div className="flex flex-col gap-1.5 pl-1">
+                      {controlRow('Color', layer('parkColor'), (c) => updateLayers({ parkColor: c }), layer('parkOpacity'), (n) => updateLayers({ parkOpacity: n }))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Land */}
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-zinc-600 dark:text-zinc-300">Land</span>
+                    <ColorPicker color={layer('landColor')} onChange={(c) => updateLayers({ landColor: c })} />
+                  </div>
+                </div>
+              </div>
             </div>
 
             <Separator />
 
-            <div className="flex flex-col gap-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium">Roads</span>
-                  <div className="flex items-center gap-1.5">
-                    <ColorPicker color={layer('roadColor')} onChange={(c) => updateLayers({ roadColor: c })} />
-                    <Select value={String(layer('roadWidth'))} onValueChange={(v) => v && updateLayers({ roadWidth: parseFloat(v) })}>
-                      <SelectTrigger className="text-xs h-7 w-20 px-2">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="0.5">Thin</SelectItem>
-                        <SelectItem value="1">Normal</SelectItem>
-                        <SelectItem value="1.5">Thick</SelectItem>
-                        <SelectItem value="2">Heavy</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Select value={String(layer('roadOpacity'))} onValueChange={(v) => v && updateLayers({ roadOpacity: parseFloat(v) })}>
-                      <SelectTrigger className="text-xs h-7 w-16 px-2">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="0.5">0.5</SelectItem>
-                        <SelectItem value="0.7">0.7</SelectItem>
-                        <SelectItem value="1">1</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium">Buildings</span>
-                  <div className="flex items-center gap-1.5">
-                    <ColorPicker color={layer('buildingColor')} onChange={(c) => updateLayers({ buildingColor: c })} />
-                    <ColorPicker color={layer('buildingOutlineColor')} onChange={(c) => updateLayers({ buildingOutlineColor: c })} />
-                    <Select value={String(layer('buildingOpacity'))} onValueChange={(v) => v && updateLayers({ buildingOpacity: parseFloat(v) })}>
-                      <SelectTrigger className="text-xs h-7 w-16 px-2">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="0.3">0.3</SelectItem>
-                        <SelectItem value="0.6">0.6</SelectItem>
-                        <SelectItem value="1">1</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                {controlRow('Water', layer('waterColor'), (c) => updateLayers({ waterColor: c }), layer('waterOpacity'), (n) => updateLayers({ waterOpacity: n }))}
-                {controlRow('Parks', layer('parkColor'), (c) => updateLayers({ parkColor: c }), layer('parkOpacity'), (n) => updateLayers({ parkOpacity: n }))}
-                {controlRow('Land', layer('landColor'), (c) => updateLayers({ landColor: c }), 1, () => {}, ['1'])}
-              </div>
-
-              <Separator />
-
-              <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 text-xs">
-                <Label className="flex items-center gap-1.5 cursor-pointer">
-                  <Switch checked={layer('showTerrain')} onCheckedChange={(c) => updateLayers({ showTerrain: c })} />
-                  <Mountain className="h-3.5 w-3.5" /> Terrain
-                </Label>
-                <Label className="flex items-center gap-1.5 cursor-pointer">
-                  <Switch checked={layer('showContourLines')} onCheckedChange={(c) => updateLayers({ showContourLines: c })} />
-                  <Mountain className="h-3.5 w-3.5" /> Contours
-                </Label>
-                <Label className="flex items-center gap-1.5 cursor-pointer">
-                  <Switch checked={layer('showSatellite')} onCheckedChange={(c) => updateLayers({ showSatellite: c })} />
-                  <Satellite className="h-3.5 w-3.5" /> Satellite
-                </Label>
-                <Label className="flex items-center gap-1.5 cursor-pointer">
-                  <Switch checked={layer('showTransitStops')} onCheckedChange={(c) => updateLayers({ showTransitStops: c })} />
-                  <Train className="h-3.5 w-3.5" /> Transit
-                </Label>
-                  <Label className="flex items-center gap-1.5 cursor-pointer">
-                    <Switch checked={layer('showTrails')} onCheckedChange={(c) => updateLayers({ showTrails: c })} />
-                    <Footprints className="h-3.5 w-3.5" /> Trails
-                  </Label>
-                  <Label className="flex items-center gap-1.5 cursor-pointer">
-                    <Switch checked={layer('showAdminBoundaries')} onCheckedChange={(c) => updateLayers({ showAdminBoundaries: c })} />
-                    <Landmark className="h-3.5 w-3.5" /> Administrative borders
-                  </Label>
-                </div>
-
-              <Separator />
-
-              {layer('showContourLines') && (
+            {/* Overlays */}
+            <div className="flex flex-col gap-3">
+              <div className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Overlays</div>
+              <div className="flex flex-col gap-2.5">
+                {/* Terrain */}
                 <div className="flex flex-col gap-1.5">
-                  {controlRow('Contour color', layer('contourLineColor'), (c) => updateLayers({ contourLineColor: c }), 0.6, () => {}, ['0.3', '0.6', '1'])}
-                  {controlRow('Index color', layer('contourIndexColor'), (c) => updateLayers({ contourIndexColor: c }), 0.9, () => {}, ['0.3', '0.6', '1'])}
-                </div>
-              )}
-
-              <div className="flex flex-col gap-2">
-                <Label className="flex items-center gap-1.5 cursor-pointer">
-                  <Switch checked={placeNames.show} onCheckedChange={(c) => updatePlaceNames({ show: c })} />
-                  <MapPin className="h-3.5 w-3.5" /> Place names
-                </Label>
-                {placeNames.show && (
-                  <div className="flex flex-col gap-1.5 pl-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium">Language</span>
-                      <Select
-                        value={placeNames.lang}
-                        onValueChange={(v) => v && updatePlaceNames({ lang: v as PlaceNameLang })}
-                      >
-                        <SelectTrigger className="text-xs h-7 w-28 px-2">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="local">Local names</SelectItem>
-                          <SelectItem value="english">English names</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    {PLACE_TIER_ROWS.map(({ key, icon, label, allowItalic, allowUppercase }) => (
-                      <PlaceTierRow
-                        key={key}
-                        icon={icon}
-                        label={label}
-                        allowItalic={allowItalic}
-                        allowUppercase={allowUppercase}
-                        style={placeNames[key]}
-                        onChange={(c) => updateTier(key, c)}
-                      />
-                    ))}
+                  <div className="flex items-center justify-between">
+                    <Label className="flex items-center gap-1.5 cursor-pointer">
+                      <Switch checked={layer('showTerrain')} onCheckedChange={(c) => updateLayers({ showTerrain: c })} />
+                      <Mountain className="h-3.5 w-3.5" /> Terrain
+                    </Label>
                   </div>
-                )}
+                  {layer('showTerrain') && (
+                    <div className="flex flex-col gap-1.5 pl-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-zinc-500 dark:text-zinc-400">Opacity</span>
+                        <Select value={String(layer('terrainOpacity'))} onValueChange={(v) => v && updateLayers({ terrainOpacity: parseFloat(v) })}>
+                          <SelectTrigger className="text-xs h-7 w-16 px-2">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="0.2">0.2</SelectItem>
+                            <SelectItem value="0.5">0.5</SelectItem>
+                            <SelectItem value="0.8">0.8</SelectItem>
+                            <SelectItem value="1">1</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Contours */}
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="flex items-center gap-1.5 cursor-pointer">
+                      <Switch checked={layer('showContourLines')} onCheckedChange={(c) => updateLayers({ showContourLines: c })} />
+                      <Mountain className="h-3.5 w-3.5" /> Contours
+                    </Label>
+                  </div>
+                  {layer('showContourLines') && (
+                    <div className="flex flex-col gap-1.5 pl-1">
+                      {controlRow('Contour color', layer('contourLineColor'), (c) => updateLayers({ contourLineColor: c }), 0.6, () => {}, ['0.3', '0.6', '1'])}
+                      {controlRow('Index color', layer('contourIndexColor'), (c) => updateLayers({ contourIndexColor: c }), 0.9, () => {}, ['0.3', '0.6', '1'])}
+                    </div>
+                  )}
+                </div>
+
+                {/* Satellite */}
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="flex items-center gap-1.5 cursor-pointer">
+                      <Switch checked={layer('showSatellite')} onCheckedChange={(c) => updateLayers({ showSatellite: c })} />
+                      <Satellite className="h-3.5 w-3.5" /> Satellite
+                    </Label>
+                  </div>
+                  {layer('showSatellite') && (
+                    <div className="flex flex-col gap-1.5 pl-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-zinc-500 dark:text-zinc-400">Opacity</span>
+                        <Select value={String(layer('satelliteOpacity'))} onValueChange={(v) => v && updateLayers({ satelliteOpacity: parseFloat(v) })}>
+                          <SelectTrigger className="text-xs h-7 w-16 px-2">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="0.2">0.2</SelectItem>
+                            <SelectItem value="0.5">0.5</SelectItem>
+                            <SelectItem value="0.8">0.8</SelectItem>
+                            <SelectItem value="1">1</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Trails */}
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="flex items-center gap-1.5 cursor-pointer">
+                      <Switch checked={layer('showTrails')} onCheckedChange={(c) => updateLayers({ showTrails: c })} />
+                      <Footprints className="h-3.5 w-3.5" /> Trails
+                    </Label>
+                  </div>
+                  {layer('showTrails') && (
+                    <div className="flex flex-col gap-1.5 pl-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-zinc-500 dark:text-zinc-400">Color</span>
+                        <ColorPicker color={layer('trailColor')} onChange={(c) => updateLayers({ trailColor: c })} />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-zinc-500 dark:text-zinc-400">Width</span>
+                        <Select value={String(layer('trailWidth'))} onValueChange={(v) => v && updateLayers({ trailWidth: parseFloat(v) })}>
+                          <SelectTrigger className="text-xs h-7 w-20 px-2">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="0.5">Thin</SelectItem>
+                            <SelectItem value="1.5">Normal</SelectItem>
+                            <SelectItem value="3">Thick</SelectItem>
+                            <SelectItem value="5">Heavy</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Admin borders */}
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="flex items-center gap-1.5 cursor-pointer">
+                      <Switch checked={layer('showAdminBoundaries')} onCheckedChange={(c) => updateLayers({ showAdminBoundaries: c })} />
+                      <Landmark className="h-3.5 w-3.5" /> Administrative borders
+                    </Label>
+                  </div>
+                  {layer('showAdminBoundaries') && (
+                    <div className="flex flex-col gap-1.5 pl-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-zinc-500 dark:text-zinc-400">Color</span>
+                        <ColorPicker color={layer('adminBoundaryColor')} onChange={(c) => updateLayers({ adminBoundaryColor: c })} />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-zinc-500 dark:text-zinc-400">Width</span>
+                        <Select value={String(layer('adminBoundaryWidth'))} onValueChange={(v) => v && updateLayers({ adminBoundaryWidth: parseFloat(v) })}>
+                          <SelectTrigger className="text-xs h-7 w-20 px-2">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="0.2">Thin</SelectItem>
+                            <SelectItem value="0.4">Normal</SelectItem>
+                            <SelectItem value="0.8">Thick</SelectItem>
+                            <SelectItem value="1.2">Heavy</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
+            </div>
+
+            <Separator />
+
+            {/* Labels */}
+            <div className="flex flex-col gap-3">
+              <div className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Labels</div>
+              <div className="flex flex-col gap-2.5">
+                {/* Place names */}
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="flex items-center gap-1.5 cursor-pointer">
+                      <Switch checked={placeNames.show} onCheckedChange={(c) => updatePlaceNames({ show: c })} />
+                      <MapPin className="h-3.5 w-3.5" /> Place names
+                    </Label>
+                  </div>
+                  {placeNames.show && (
+                    <div className="flex flex-col gap-1.5 pl-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium">Language</span>
+                        <Select
+                          value={placeNames.lang}
+                          onValueChange={(v) => v && updatePlaceNames({ lang: v as PlaceNameLang })}
+                        >
+                          <SelectTrigger className="text-xs h-7 w-28 px-2">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="local">Local names</SelectItem>
+                            <SelectItem value="english">English names</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {PLACE_TIER_ROWS.map(({ key, icon, label, allowItalic, allowUppercase }) => (
+                        <PlaceTierRow
+                          key={key}
+                          icon={icon}
+                          label={label}
+                          allowItalic={allowItalic}
+                          allowUppercase={allowUppercase}
+                          style={placeNames[key]}
+                          onChange={(c) => updateTier(key, c)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Transit */}
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="flex items-center gap-1.5 cursor-pointer">
+                      <Switch checked={layer('showTransitStops')} onCheckedChange={(c) => updateLayers({ showTransitStops: c })} />
+                      <Train className="h-3.5 w-3.5" /> Transit
+                    </Label>
+                  </div>
+                  {layer('showTransitStops') && (
+                    <div className="flex flex-col gap-1.5 pl-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-zinc-500 dark:text-zinc-400">Color</span>
+                        <ColorPicker color={layer('transitStopColor')} onChange={(c) => updateLayers({ transitStopColor: c })} />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-zinc-500 dark:text-zinc-400">Size</span>
+                        <Select value={String(layer('transitStopSize'))} onValueChange={(v) => v && updateLayers({ transitStopSize: parseFloat(v) })}>
+                          <SelectTrigger className="text-xs h-7 w-20 px-2">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="2">Small</SelectItem>
+                            <SelectItem value="3">Normal</SelectItem>
+                            <SelectItem value="5">Large</SelectItem>
+                            <SelectItem value="8">Extra large</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
