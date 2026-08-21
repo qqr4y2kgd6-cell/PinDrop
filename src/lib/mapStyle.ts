@@ -578,9 +578,6 @@ export function applyEnhancedLayerStyle(map: MapLibreMap, l: Required<MapLayerSt
 
   // --- Contour lines (generated from DEM tiles via maplibre-contour) ---
   if (l.showContourLines) {
-    console.log('[Contour] maplibreContour keys:', Object.keys(maplibreContour));
-    console.log('[Contour] DemSource:', typeof maplibreContour.DemSource);
-    console.log('[Contour] showContourLines enabled, map zoom:', map.getZoom());
     if (!contourDemSource) {
       try {
         const DemSource = maplibreContour.DemSource;
@@ -592,15 +589,11 @@ export function applyEnhancedLayerStyle(map: MapLibreMap, l: Required<MapLayerSt
           cacheSize: 100,
           timeoutMs: 10000,
         });
-        console.log('[Contour] DemSource created:', !!contourDemSource);
         try {
           contourDemSource.setupMaplibre({ addProtocol });
-          console.log('[Contour] Protocol registered');
         } catch {
-          console.log('[Contour] Protocol already registered');
         }
-      } catch (e) {
-        console.warn('[Contour] Failed to initialize contour DEM source:', e);
+      } catch {
       }
     }
 
@@ -608,20 +601,20 @@ export function applyEnhancedLayerStyle(map: MapLibreMap, l: Required<MapLayerSt
       const CONTOUR_VECTOR_SOURCE = 'contour-vector';
       const contourUrl = contourDemSource.contourProtocolUrl({
         multiplier: 1,
+        overzoom: 1,
         thresholds: {
           0: [500, 1000],
+          10: [400, 800],
           11: [200, 1000],
           12: [100, 500],
-          14: [50, 200],
-          15: [20, 100],
+          13: [50, 250],
+          14: [30, 150],
+          15: [15, 75],
         },
         contourLayer: 'contours',
         elevationKey: 'ele',
         levelKey: 'level',
       });
-      console.log('[Contour] Protocol URL:', contourUrl);
-      console.log('[Contour] Source exists:', map.getSource(CONTOUR_VECTOR_SOURCE));
-      console.log('[Contour] Layer exists:', map.getLayer('contour-lines'));
       if (!map.getSource(CONTOUR_VECTOR_SOURCE)) {
         try {
           map.addSource(CONTOUR_VECTOR_SOURCE, {
@@ -629,19 +622,15 @@ export function applyEnhancedLayerStyle(map: MapLibreMap, l: Required<MapLayerSt
             tiles: [contourUrl],
             maxzoom: 15,
           });
-          console.log('[Contour] Vector source added');
-          map.on('sourcedata', (e: any) => {
+          map.on('sourcedata', (e: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
             if (e.sourceId === CONTOUR_VECTOR_SOURCE) {
-              console.log('[Contour] Source data event:', e.isSourceLoaded, e.sourceDataType);
             }
           });
-          map.on('data', (e: any) => {
+          map.on('data', (e: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
             if (e.sourceId === CONTOUR_VECTOR_SOURCE) {
-              console.log('[Contour] Data event:', e.dataType, e.isSourceLoaded);
             }
           });
-        } catch (e) {
-          console.warn('[Contour] Failed to add vector source:', e);
+        } catch {
         }
       }
       if (!map.getLayer('contour-lines')) {
@@ -656,7 +645,9 @@ export function applyEnhancedLayerStyle(map: MapLibreMap, l: Required<MapLayerSt
             'line-opacity': 0.6,
           },
         });
-        console.log('[Contour] Layer added');
+        if (map.getLayer('water')) {
+          map.moveLayer('contour-lines', 'water');
+        }
       }
       map.setLayoutProperty('contour-lines', 'visibility', 'visible');
       map.setPaintProperty('contour-lines', 'line-color', l.contourLineColor);
