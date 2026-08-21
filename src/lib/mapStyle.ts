@@ -1,4 +1,6 @@
 import type { StyleSpecification, GeoJSONSource, Map as MapLibreMap, FilterSpecification, SymbolLayerSpecification } from 'maplibre-gl';
+import { addProtocol } from 'maplibre-gl';
+import maplibreContour from 'maplibre-contour';
 import type { POI, ColorMode, MapViewport, MapLayerStyle, PlaceNameTierStyle, PlaceNamesConfig, PlaceNameLang } from '@/types';
 import { autoGridSpacing, buildGridGeometry, bboxToFrameRect, GRID_REF_LETTERS } from './grid';
 import { spiderify as spiderifyPois } from './spiderify';
@@ -477,6 +479,7 @@ export function removePoiLayer(map: MapLibreMap) {
 
 const CONTOUR_SOURCE = 'contour-terrarium';
 const SATELLITE_SOURCE = 'satellite-eox';
+let contourDemSource: any = null; // eslint-disable-line @typescript-eslint/no-explicit-any
 
 /** Ensures the openmaptiles-based overlay layers exist (transit, trails, admin labels). */
 function ensureOverlayLayers(map: MapLibreMap) {
@@ -573,27 +576,73 @@ export function applyEnhancedLayerStyle(map: MapLibreMap, l: Required<MapLayerSt
     setLayerVisibility(map, ['hillshade'], false);
   }
 
-  // --- Contour lines (from openmaptiles contour source-layer) ---
+  // --- Contour lines (generated from DEM tiles via maplibre-contour) ---
   if (l.showContourLines) {
-    if (!map.getLayer('contour-lines')) {
-      map.addLayer({
-        id: 'contour-lines',
-        type: 'line',
-        source: 'openmaptiles',
-        'source-layer': 'contour',
-        filter: ['match', ['get', 'level'], [0, 1], true, false] as FilterSpecification,
-        paint: {
-          'line-color': l.contourLineColor,
-          'line-width': l.contourLineWidth,
-          'line-opacity': 0.6,
-        },
-      }, 'hillshade');
+    if (!contourDemSource) {
+      try {
+        const DemSource = maplibreContour.DemSource;
+        contourDemSource = new DemSource({
+          url: 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png',
+          encoding: 'terrarium',
+          maxzoom: 14,
+          worker: false,
+          cacheSize: 100,
+          timeoutMs: 10000,
+        });
+        try {
+          contourDemSource.setupMaplibre({ addProtocol });
+        } catch {
+          // protocol already registered
+        }
+      } catch (e) {
+        console.warn('Failed to initialize contour DEM source:', e);
+      }
     }
-    map.setLayoutProperty('contour-lines', 'visibility', 'visible');
-    map.setPaintProperty('contour-lines', 'line-color', l.contourLineColor);
-    map.setPaintProperty('contour-lines', 'line-width', l.contourLineWidth);
+
+    if (contourDemSource) {
+      const CONTOUR_VECTOR_SOURCE = 'contour-vector';
+      if (!map.getSource(CONTOUR_VECTOR_SOURCE)) {
+        try {
+          map.addSource(CONTOUR_VECTOR_SOURCE, {
+            type: 'vector',
+            tiles: [contourDemSource.contourProtocolUrl({
+              multiplier: 1,
+              thresholds: {
+                11: [200, 1000],
+                12: [100, 500],
+                14: [50, 200],
+                15: [20, 100],
+              },
+              contourLayer: 'contours',
+              elevationKey: 'ele',
+              levelKey: 'level',
+            })],
+            maxzoom: 15,
+          });
+        } catch { /* source already exists */ }
+      }
+      if (!map.getLayer('contour-lines')) {
+        map.addLayer({
+          id: 'contour-lines',
+          type: 'line',
+          source: CONTOUR_VECTOR_SOURCE,
+          'source-layer': 'contours',
+          paint: {
+            'line-color': l.contourLineColor,
+            'line-width': l.contourLineWidth,
+            'line-opacity': 0.6,
+          },
+        }, 'hillshade');
+      }
+      map.setLayoutProperty('contour-lines', 'visibility', 'visible');
+      map.setPaintProperty('contour-lines', 'line-color', l.contourLineColor);
+      map.setPaintProperty('contour-lines', 'line-width', l.contourLineWidth);
+    }
   } else {
     setLayerVisibility(map, ['contour-lines'], false);
+    const CONTOUR_VECTOR_SOURCE = 'contour-vector';
+    if (map.getLayer('contour-lines')) map.removeLayer('contour-lines');
+    if (map.getSource(CONTOUR_VECTOR_SOURCE)) map.removeSource(CONTOUR_VECTOR_SOURCE);
   }
 
   // --- Satellite overlay (raster source + layer) ---
