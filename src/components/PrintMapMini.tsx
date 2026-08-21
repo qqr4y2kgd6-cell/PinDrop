@@ -99,6 +99,7 @@ export function PrintMapMini({ viewport, className, onLoad, onUpdate, spotColor:
       const pw = viewport.positionOnPage.width * CSS_PX_PER_MM;
       const ls = Math.max(0.5, EDITOR_APPROX_WIDTH / pw);
       applyViewportStyle(map, { viewport, pois, colorMode, spotColor, labelScale: ls });
+      applyEnhancedLayerStyle(map, { ...DEFAULT_LAYER_STYLE, ...viewport.layers });
       if (onLoad) onLoad(map);
     };
 
