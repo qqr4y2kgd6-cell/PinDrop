@@ -509,8 +509,7 @@ function ensureOverlayLayers(map: MapLibreMap) {
       filter: ['match', ['get', 'class'], ['path', 'track', 'trail'], true, false] as FilterSpecification,
       paint: {
         'line-color': '#8B4513',
-        'line-width': 0.3,
-        'line-dasharray': [4, 2],
+        'line-width': 1.5,
         'line-opacity': 0,
       },
     }, 'poi-legs');
@@ -724,7 +723,6 @@ export function applyEnhancedLayerStyle(map: MapLibreMap, l: Required<MapLayerSt
     map.setLayoutProperty('trail', 'visibility', visible ? 'visible' : 'none');
     map.setPaintProperty('trail', 'line-color', l.trailColor);
     map.setPaintProperty('trail', 'line-width', visible ? l.trailWidth : 0);
-    map.setPaintProperty('trail', 'line-dasharray', l.trailDashArray);
     map.setPaintProperty('trail', 'line-opacity', visible ? 0.8 : 0);
   }
 
@@ -793,8 +791,7 @@ export const DEFAULT_LAYER_STYLE: Required<MapLayerStyle> = {
   // Trails
   showTrails: false,
   trailColor: '#8B4513',
-  trailWidth: 0.3,
-  trailDashArray: [4, 2],
+  trailWidth: 1.5,
   // Admin boundaries
   showAdminBoundaries: true,
   adminBoundaryColor: '#9a9a9a',

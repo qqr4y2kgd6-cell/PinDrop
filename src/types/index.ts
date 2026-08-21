@@ -171,7 +171,6 @@ export interface MapLayerStyle {
   showTrails?: boolean;
   trailColor?: string;
   trailWidth?: number;
-  trailDashArray?: number[];
   // Administrative boundaries (enhanced)
   showAdminBoundaries?: boolean;
   adminBoundaryColor?: string;
