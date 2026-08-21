@@ -6,6 +6,7 @@ import { computeGridRefs, insetViewports, EDITOR_LABEL_SCALE } from './mapStyle'
 import { createViewportMap, applyViewportStyle } from './viewportMap';
 import { ensureMapWorker } from './maplibreWorker';
 import { titleFontPdf } from './titleFonts';
+import { preloadLayoutFonts } from './placeNameFonts';
 import { resolveIndexConfig, buildIndexGroups, distributeGroups, scopePois } from './indexStyle';
 import { indexIconFor, drawIndexIcon } from './indexIcons';
 import { footprintDims, TITLE_BAR_MM } from './units';
@@ -165,7 +166,8 @@ function renderViewportImage(
   pois: POI[],
   colorMode: ColorMode,
   spotColor: string,
-  itemSpacing = 0
+  itemSpacing = 0,
+  glyphsUrl?: string,
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     const { w: mmW, h: mmH } = mapAreaSize(vp, itemSpacing);
@@ -185,7 +187,7 @@ function renderViewportImage(
     container.style.cssText = `position:fixed;left:-10000px;top:0;width:${cssW}px;height:${cssH}px;`;
     document.body.appendChild(container);
 
-    const map = createViewportMap(container, { viewport: vp, labelScale: EDITOR_LABEL_SCALE, pixelRatio: targetPixelRatio });
+    const map = createViewportMap(container, { viewport: vp, labelScale: EDITOR_LABEL_SCALE, pixelRatio: targetPixelRatio, glyphsUrl });
 
     const timeout = window.setTimeout(() => {
       // 'idle' is rAF-driven, so in a throttled/background tab it may never fire.
@@ -827,13 +829,17 @@ export async function exportLayout(pages: PrintPage[], pois: POI[]): Promise<Exp
   const colorModes = new Map(pages.map((p) => [p.id, p.colorMode ?? 'spot']));
   const spotColors = new Map(pages.map((p) => [p.id, p.spotColor]));
 
+  // Pre-load all Google Fonts used by place-name tiers so the map renderers
+  // don't have to wait for fire-and-forget loads triggered by the style.
+  await Promise.allSettled(pages.flatMap((p) => p.viewports.map((vp) => preloadLayoutFonts(vp.layers?.placeNames))));
+
   await Promise.all(
     tasks.map(async ({ page, vp }) => {
       const key = `${page.id}:${vp.id}`;
       const colorMode = colorModes.get(page.id) ?? 'spot';
       const spotColor = spotColors.get(page.id) ?? '#e0563d';
       try {
-        images[key] = await renderViewportImage(vp, pois, colorMode, spotColor, page.itemSpacing ?? 0);
+        images[key] = await renderViewportImage(vp, pois, colorMode, spotColor, page.itemSpacing ?? 0, page.glyphsUrl);
       } catch (e) {
         console.warn(`Map render failed for "${vp.title}" — the frame is omitted from the PDF.`, e);
         throw e;

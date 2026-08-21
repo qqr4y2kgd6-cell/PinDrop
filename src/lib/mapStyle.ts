@@ -3,10 +3,9 @@ import type { POI, ColorMode, MapViewport, MapLayerStyle, PlaceNameTierStyle, Pl
 import { autoGridSpacing, buildGridGeometry, bboxToFrameRect, GRID_REF_LETTERS } from './grid';
 import { spiderify as spiderifyPois } from './spiderify';
 import { CSS_PX_PER_MM, TITLE_BAR_MM } from './units';
+import { glyphFontstack } from './placeNameFonts';
 
 export type { ColorMode };
-
-const GLYPHS_URL = 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf';
 
 const SOURCE = {
   type: 'vector' as const,
@@ -80,7 +79,7 @@ export interface ResolvedPlaceNames {
 }
 
 function defaultTier(color: string, sizeMm: number, bold = false, italic = false, uppercase = false): Required<PlaceNameTierStyle> {
-  return { show: false, color, sizeMm, bold, italic, uppercase, haloColor: '#ffffff', haloWidthMm: 0.3 };
+  return { show: false, color, sizeMm, bold, italic, uppercase, haloColor: '#ffffff', haloWidthMm: 0.3, fontFamily: '' };
 }
 
 export const DEFAULT_PLACE_NAMES: ResolvedPlaceNames = {
@@ -166,7 +165,7 @@ function placeNameStyleLayers(labelScale = 1): StyleSpecification['layers'] {
   const n = DEFAULT_PLACE_NAMES;
   const pxPerMm = CSS_PX_PER_MM * labelScale;
   const textSize = (sizeMm: number) => sizeMm * pxPerMm;
-  const font = (tier: Required<PlaceNameTierStyle>) => (tier.bold ? 'Noto Sans Bold' : tier.italic ? 'Noto Sans Italic' : 'Noto Sans Regular');
+  const font = (tier: Required<PlaceNameTierStyle>) => glyphFontstack(tier.fontFamily, tier.bold, tier.italic);
   const halo = (tier: Required<PlaceNameTierStyle>) => ({
     'text-color': tier.color,
     'text-halo-color': tier.haloColor,
@@ -181,7 +180,7 @@ function placeNameStyleLayers(labelScale = 1): StyleSpecification['layers'] {
       'place',
       ['in', 'class', ...PLACE_TIER_CLASSES[tier]] as FilterSpecification,
       {
-        'text-font': [font(t)],
+        'text-font': font(t),
         'text-size': rankExpr ?? textSize(t.sizeMm),
         'symbol-sort-key': PLACE_TIER_SORT_KEY[tier],
         ...(t.uppercase || transform ? { 'text-transform': caseTransform } : {}),
@@ -195,7 +194,7 @@ function placeNameStyleLayers(labelScale = 1): StyleSpecification['layers'] {
       'water-name',
       'water_name',
       ['all', ['in', 'class', ...WATER_NAME_CLASSES], ['has', 'name']] as FilterSpecification,
-      { 'text-font': [font(n.water)], 'text-size': textSize(n.water.sizeMm), 'symbol-sort-key': PLACE_TIER_SORT_KEY.water },
+      { 'text-font': font(n.water), 'text-size': textSize(n.water.sizeMm), 'symbol-sort-key': PLACE_TIER_SORT_KEY.water },
       halo(n.water)
     ),
     placeLayer('island'),
@@ -208,7 +207,7 @@ function placeNameStyleLayers(labelScale = 1): StyleSpecification['layers'] {
       'road-name',
       'transportation_name',
       ['all', ['in', 'class', ...ROAD_NAME_CLASSES], ['has', 'name']] as FilterSpecification,
-      { 'symbol-placement': 'line', 'symbol-spacing': Math.round(300 * labelScale), 'symbol-sort-key': PLACE_TIER_SORT_KEY.road, 'text-font': [font(n.road)], 'text-size': textSize(n.road.sizeMm), 'text-letter-spacing': 0.05 },
+      { 'symbol-placement': 'line', 'symbol-spacing': Math.round(300 * labelScale), 'symbol-sort-key': PLACE_TIER_SORT_KEY.road, 'text-font': font(n.road), 'text-size': textSize(n.road.sizeMm), 'text-letter-spacing': 0.05 },
       halo(n.road)
     ),
   ];
@@ -218,7 +217,13 @@ function placeNameStyleLayers(labelScale = 1): StyleSpecification['layers'] {
  * A minimalist, print-optimized vector map style built on OpenFreeMap tiles.
  * High contrast, thin crisp roads, flat fills and no label clutter.
  */
-export function createPrintStyle(labelScale = 1): StyleSpecification {
+/**
+ * Build the print-map style. `glyphsUrl` points at the same-origin glyph proxy
+ * (`/api/glyphs/...`) which forwards to the public OpenMapTiles/OSM.us font
+ * server and resolves `text-font` fallback stacks. Defaults to that proxy so
+ * place-name fonts (incl. Norwegian æ/ø/å) render without any CORS issues.
+ */
+export function createPrintStyle(labelScale = 1, glyphsUrl: string = GLYPHS_URL): StyleSpecification {
   const layers: StyleSpecification['layers'] = [
     {
       id: 'background',
@@ -303,13 +308,16 @@ export function createPrintStyle(labelScale = 1): StyleSpecification {
   return {
     version: 8,
     sources: { openmaptiles: SOURCE },
-    glyphs: GLYPHS_URL,
+    glyphs: glyphsUrl,
     layers,
   };
 }
 
 /** On-screen multiplier for place-name text (editor + layout preview only). */
 export const EDITOR_LABEL_SCALE = 2;
+
+/** Same-origin proxy to the public OSM.us glyph server (CORS-safe). */
+const GLYPHS_URL = '/api/glyphs/{fontstack}/{range}.pbf';
 
 export const ROAD_LAYER_IDS = ROADS.map((r) => r.id);
 
@@ -768,13 +776,13 @@ export function applyLayerStyleOverrides(map: MapLibreMap, layers?: MapLayerStyl
 
   const pn = resolvePlaceNames(l.placeNames);
   const englishText = pn.lang === 'english';
-  const setTier = (id: string, tier: Required<PlaceNameTierStyle>, opts: { font: string; size: number; uppercase?: boolean; letterSpacing?: number }) => {
+  const setTier = (id: string, tier: Required<PlaceNameTierStyle>, opts: { font: string[]; size: number; uppercase?: boolean; letterSpacing?: number }) => {
     if (!map.getLayer(id)) return;
     const visible = pn.show && tier.show;
     map.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none');
     if (!visible) return;
     map.setLayoutProperty(id, 'text-field', englishText ? ['coalesce', ['get', 'name:en'], ['get', 'name_en'], ['get', 'name:latin'], ['get', 'name']] : ['get', 'name']);
-    map.setLayoutProperty(id, 'text-font', [opts.font]);
+    map.setLayoutProperty(id, 'text-font', opts.font);
     map.setLayoutProperty(id, 'text-size', opts.size);
     if (opts.uppercase !== undefined) map.setLayoutProperty(id, 'text-transform', opts.uppercase ? 'uppercase' : 'none');
     if (opts.letterSpacing !== undefined) map.setLayoutProperty(id, 'text-letter-spacing', opts.letterSpacing);
@@ -783,14 +791,14 @@ export function applyLayerStyleOverrides(map: MapLibreMap, layers?: MapLayerStyl
     map.setPaintProperty(id, 'text-halo-width', tier.haloWidthMm * pxPerMm);
   };
 
-  setTier('water-name', pn.water, { font: pn.water.italic ? 'Noto Sans Italic' : 'Noto Sans Regular', size: pn.water.sizeMm * pxPerMm });
-  setTier('place-island', pn.island, { font: pn.island.italic ? 'Noto Sans Italic' : 'Noto Sans Regular', size: pn.island.sizeMm * pxPerMm });
-  setTier('place-country', pn.country, { font: 'Noto Sans Bold', size: rankTextSizeExpr(pn.country.sizeMm, 6, 1.15, 0.8, pxPerMm), uppercase: true });
-  setTier('place-city', pn.city, { font: 'Noto Sans Bold', size: rankTextSizeExpr(pn.city.sizeMm, 10, 1.25, 0.7, pxPerMm) });
-  setTier('place-town', pn.town, { font: pn.town.bold ? 'Noto Sans Bold' : 'Noto Sans Regular', size: rankTextSizeExpr(pn.town.sizeMm, 10, 1.2, 0.8, pxPerMm) });
-  setTier('place-village', pn.village, { font: pn.village.bold ? 'Noto Sans Bold' : 'Noto Sans Regular', size: pn.village.sizeMm * pxPerMm });
-  setTier('place-suburb', pn.suburb, { font: pn.suburb.bold ? 'Noto Sans Bold' : 'Noto Sans Regular', size: pn.suburb.sizeMm * pxPerMm });
-  setTier('road-name', pn.road, { font: pn.road.bold ? 'Noto Sans Bold' : 'Noto Sans Regular', size: pn.road.sizeMm * pxPerMm, letterSpacing: 0.05 });
+  setTier('water-name', pn.water, { font: glyphFontstack(pn.water.fontFamily, pn.water.bold, pn.water.italic), size: pn.water.sizeMm * pxPerMm });
+  setTier('place-island', pn.island, { font: glyphFontstack(pn.island.fontFamily, pn.island.bold, pn.island.italic), size: pn.island.sizeMm * pxPerMm });
+  setTier('place-country', pn.country, { font: glyphFontstack(pn.country.fontFamily, true, false), size: rankTextSizeExpr(pn.country.sizeMm, 6, 1.15, 0.8, pxPerMm), uppercase: true });
+  setTier('place-city', pn.city, { font: glyphFontstack(pn.city.fontFamily, true, false), size: rankTextSizeExpr(pn.city.sizeMm, 10, 1.25, 0.7, pxPerMm) });
+  setTier('place-town', pn.town, { font: glyphFontstack(pn.town.fontFamily, pn.town.bold, false), size: rankTextSizeExpr(pn.town.sizeMm, 10, 1.2, 0.8, pxPerMm) });
+  setTier('place-village', pn.village, { font: glyphFontstack(pn.village.fontFamily, pn.village.bold, false), size: pn.village.sizeMm * pxPerMm });
+  setTier('place-suburb', pn.suburb, { font: glyphFontstack(pn.suburb.fontFamily, pn.suburb.bold, false), size: pn.suburb.sizeMm * pxPerMm });
+  setTier('road-name', pn.road, { font: glyphFontstack(pn.road.fontFamily, pn.road.bold, false), size: pn.road.sizeMm * pxPerMm, letterSpacing: 0.05 });
 }
 
 /** Bounding box: [minLng, minLat, maxLng, maxLat] */

@@ -5,6 +5,7 @@ import type { jsPDF } from 'jspdf';
 import { GState } from 'jspdf';
 import { bboxToFrameRect, inverseMercatorY, mercatorY, type FrameProjection } from './grid';
 import { spiderify as spiderifyPois } from './spiderify';
+import { placeNameFontCss } from './placeNameFonts';
 import {
   DEFAULT_LAYER_STYLE,
   clampBbox,
@@ -105,6 +106,8 @@ export interface VectorLabel {
   priority: number;
   /** Within-tier importance (lower = more important), from the OMT `rank` field. */
   rank: number;
+  /** Font family id (from PLACE_NAME_FONTS). Falls back to Helvetica in jsPDF. */
+  fontFamily?: string;
 }
 
 /** Projected geometry + resolved colors/widths, ready to be drawn by any renderer. */
@@ -335,6 +338,7 @@ export function buildVectorMapRenderData(
       angle,
       priority,
       rank,
+      fontFamily: tier.fontFamily,
     });
   };
 
@@ -549,11 +553,20 @@ export function layoutLabels(labels: VectorLabel[], measure: (label: VectorLabel
   return placed;
 }
 
+/** Map place name font family to jsPDF core font name. */
+function pdfFontFamily(fontFamily?: string): string {
+  if (!fontFamily) return 'Helvetica';
+  const f = fontFamily.toLowerCase();
+  if (f.includes('serif') && !f.includes('sans')) return 'Times';
+  if (f.includes('courier') || f.includes('mono')) return 'Courier';
+  return 'Helvetica';
+}
+
 function drawLabelsPdf(doc: jsPDF, labels: VectorLabel[]) {
   const placed = layoutLabels(
     labels,
     (l) => {
-      doc.setFont('Helvetica', l.bold ? 'bold' : l.italic ? 'italic' : 'normal');
+      doc.setFont(pdfFontFamily(l.fontFamily), l.bold ? 'bold' : l.italic ? 'italic' : 'normal');
       doc.setFontSize(l.sizeMm * MM_TO_PT);
       return doc.getTextWidth(l.uppercase ? l.text.toUpperCase() : l.text);
     },
@@ -563,7 +576,7 @@ function drawLabelsPdf(doc: jsPDF, labels: VectorLabel[]) {
     const text = label.uppercase ? label.text.toUpperCase() : label.text;
     const style = label.bold ? 'bold' : label.italic ? 'italic' : 'normal';
     const opts = { align: 'center' as const, baseline: 'middle' as const, angle: label.angle ?? 0 };
-    doc.setFont('Helvetica', style);
+    doc.setFont(pdfFontFamily(label.fontFamily), style);
     doc.setFontSize(label.sizeMm * MM_TO_PT);
     if (label.haloWidthMm > 0) {
       const [hr, hg, hb] = hexToRgb(label.haloColor);
@@ -723,7 +736,7 @@ export function renderMapThumbnail(
       render.labels,
       (l) => {
         const text = l.uppercase ? l.text.toUpperCase() : l.text;
-        ctx.font = `${l.bold ? 'bold ' : ''}${l.italic ? 'italic ' : ''}${Math.max(1, l.sizeMm * scale)}px sans-serif`;
+        ctx.font = `${l.bold ? 'bold ' : ''}${l.italic ? 'italic ' : ''}${Math.max(1, l.sizeMm * scale)}px ${placeNameFontCss(l.fontFamily)}`;
         return ctx.measureText(text).width;
       },
       scale
@@ -733,7 +746,7 @@ export function renderMapThumbnail(
     ctx.lineJoin = 'round';
     for (const { label } of placed) {
       const text = label.uppercase ? label.text.toUpperCase() : label.text;
-      ctx.font = `${label.bold ? 'bold ' : ''}${label.italic ? 'italic ' : ''}${Math.max(1, label.sizeMm * scale)}px sans-serif`;
+      ctx.font = `${label.bold ? 'bold ' : ''}${label.italic ? 'italic ' : ''}${Math.max(1, label.sizeMm * scale)}px ${placeNameFontCss(label.fontFamily)}`;
       if (label.haloWidthMm > 0) {
         ctx.lineWidth = label.haloWidthMm * 2 * scale;
         ctx.strokeStyle = label.haloColor;

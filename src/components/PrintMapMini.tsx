@@ -8,6 +8,7 @@ import { useMap } from '@/context/MapContext';
 import { applyLayerStyleOverrides } from '@/lib/mapStyle';
 import { CSS_PX_PER_MM } from '@/lib/units';
 import { createViewportMap, addViewportPois, applyViewportStyle, fitViewportBbox } from '@/lib/viewportMap';
+import { ensureGoogleFonts } from '@/lib/placeNameFonts';
 import { ensureMapWorker } from '@/lib/maplibreWorker';
 
 ensureMapWorker();
@@ -77,10 +78,16 @@ export function PrintMapMini({ viewport, className, onLoad, onUpdate, spotColor:
     const inner = innerRef.current;
     if (!inner || mapRef.current) return;
 
+    let cancelled = false;
+
+    (async () => {
+      await ensureGoogleFonts();
+      if (cancelled || !innerRef.current || mapRef.current) return;
+
     const printWidthPx = viewport.positionOnPage.width * CSS_PX_PER_MM;
     const tileLabelScale = Math.max(0.5, EDITOR_APPROX_WIDTH / printWidthPx);
 
-    const map = createViewportMap(inner, {
+    const map = createViewportMap(innerRef.current, {
       viewport,
       labelScale: tileLabelScale,
       interactive: false,
@@ -127,11 +134,13 @@ export function PrintMapMini({ viewport, className, onLoad, onUpdate, spotColor:
     ro.observe(inner);
 
     return () => {
+      cancelled = true;
       ro.disconnect();
       map.off('style.load', onStyleLoad);
       map.remove();
       mapRef.current = null;
     };
+    })(); // async IIFE – ensureGoogleFonts
   }, [viewport.id]);
 
   // Keep center/zoom in sync when edited externally (frame zoom buttons, props)

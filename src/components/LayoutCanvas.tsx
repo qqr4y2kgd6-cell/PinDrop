@@ -1400,6 +1400,19 @@ function PageSettings({ page, onUpdate }: { page: PrintLayout; onUpdate: (u: Par
         <ColorPicker color={page.defaultTitleTextColor ?? '#ffffff'} onChange={(c) => onUpdate({ defaultTitleTextColor: c })} />
       </Field>
       <Separator />
+      <p className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-200">Map settings</p>
+      <Field label="Glyphs server URL">
+        <Input
+          value={page.glyphsUrl ?? ''}
+          placeholder="Default (OpenFreeMap)"
+          onChange={(e) => onUpdate({ glyphsUrl: e.target.value || undefined })}
+          className="h-8 text-sm"
+        />
+      </Field>
+      <p className="text-[10px] text-zinc-400 leading-tight">
+        For more fonts, use: tiles.openstreetmap.us/fonts/{'{fontstack}'}/{'{range}'}.pbf
+      </p>
+      <Separator />
       <p className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-200">Index list defaults</p>
       <Field label="Default columns">
         <Num value={page.indexColumns ?? 2} onChange={(v) => onUpdate({ indexColumns: Math.max(1, Math.round(v) || 1) })} min={1} max={6} />

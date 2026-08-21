@@ -184,6 +184,8 @@ export interface PlaceNameTierStyle {
   uppercase?: boolean;
   haloColor?: string;
   haloWidthMm?: number;
+  /** Font family id (from PLACE_NAME_FONTS). Falls back to 'Noto Sans'. */
+  fontFamily?: string;
 }
 
 export type PlaceNameLang = 'local' | 'english';
@@ -337,6 +339,9 @@ export interface PrintLayout {
   titleFontSize?: number; // mm
   titleFontWeight?: 'normal' | 'medium' | 'bold';
   colorMode?: ColorMode;
+  /** URL template for MapLibre glyph PBFs. Defaults to OpenFreeMap.
+   *  Example: 'https://tiles.openstreetmap.us/fonts/{fontstack}/{range}.pbf' */
+  glyphsUrl?: string;
   // Index list (legend) tile default appearance — per-tile configs inherit these.
   indexListTitle?: string;
   indexListShowTitle?: boolean;

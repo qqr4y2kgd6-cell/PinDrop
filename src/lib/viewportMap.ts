@@ -16,6 +16,8 @@ export interface ViewportMapOptions {
   labelScale?: number;
   pixelRatio?: number;
   interactive?: boolean;
+  /** Override for the style's glyphs URL (defaults to the same-origin proxy). */
+  glyphsUrl?: string;
 }
 
 /**
@@ -25,10 +27,10 @@ export interface ViewportMapOptions {
  * text-size multiplier used by the editor/layout previews.
  */
 export function createViewportMap(container: HTMLElement, opts: ViewportMapOptions): Map {
-  const { viewport, labelScale = EDITOR_LABEL_SCALE, pixelRatio, interactive = false } = opts;
+  const { viewport, labelScale = EDITOR_LABEL_SCALE, pixelRatio, interactive = false, glyphsUrl } = opts;
   return new Map({
     container,
-    style: createPrintStyle(labelScale),
+    style: createPrintStyle(labelScale, glyphsUrl),
     center: viewport.center,
     zoom: viewport.zoom,
     bearing: viewport.rotation ?? 0,

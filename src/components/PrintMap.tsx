@@ -8,6 +8,7 @@ import { useMap } from '@/context/MapContext';
 import { createPrintStyle, addPoiLayer, clampBbox, applyLayerStyleOverrides, applyEnhancedLayerStyle, viewportBounds, DEFAULT_LAYER_STYLE, EDITOR_LABEL_SCALE, viewportActivePois, insetViewports, resolvePlaceNames, type PlaceNameTierKey } from '@/lib/mapStyle';
 import { nearestCartographicZoom } from '@/lib/grid';
 import { TITLE_BAR_MM } from '@/lib/units';
+import { PLACE_NAME_FONTS, ensureGoogleFonts } from '@/lib/placeNameFonts';
 import { GridOverlay } from './GridOverlay';
 import { Button } from '@/components/ui/button';
 import { Target, Grid, ZoomIn, ZoomOut, Road, Building, Waves, TreePine, MapPin, Landmark, Building2, Home, Map as MapIcon, Anchor, ChevronDown, ChevronRight, Mountain, Satellite, Train, Footprints, Flag, type LucideIcon } from 'lucide-react';
@@ -89,6 +90,21 @@ function PlaceTierRow({ icon: Icon, label, style, allowItalic, allowUppercase, o
       </div>
       {open && (
         <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 pl-5">
+          <div className="flex flex-col gap-1">
+            <Label className="text-xs text-zinc-500">Font</Label>
+            <Select value={style.fontFamily || 'Noto Sans'} onValueChange={(v) => onChange({ fontFamily: v ?? undefined })}>
+              <SelectTrigger className="text-xs h-7 px-2">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PLACE_NAME_FONTS.map((f) => (
+                  <SelectItem key={f.id} value={f.id}>
+                    {f.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <div className="flex flex-col gap-1">
             <Label className="text-xs text-zinc-500">Halo</Label>
             <div className="flex items-center gap-1.5">
@@ -275,6 +291,15 @@ export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
   useEffect(() => {
     if (!mapContainer.current || mapRef.current || !viewport || !containerReady) return;
 
+    let cancelled = false;
+
+    (async () => {
+      // Ensure Google Fonts are loaded (used by the canvas/SVG vector label
+      // renderer) before the map is created. The map's place-name glyphs come
+      // from the same-origin glyph proxy, independent of these web fonts.
+      await ensureGoogleFonts();
+      if (cancelled || !mapContainer.current || mapRef.current) return;
+
     fittedRef.current.done = false;
 
     const map = new Map({
@@ -355,6 +380,7 @@ export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
     if (mapContainer.current) ro.observe(mapContainer.current);
 
     return () => {
+      cancelled = true;
       ro.disconnect();
       cleanupStyleReady();
       if (fitTimerRef.current !== null) {
@@ -365,6 +391,7 @@ export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
       mapRef.current = null;
       fittedRef.current.done = false;
     };
+    })(); // async IIFE – ensureGoogleFonts
   }, [viewport?.id, fitToBbox, ensureStyleReady, containerReady]);
 
   // Sync external center/zoom edits. When the viewport carries a `bbox`, that
