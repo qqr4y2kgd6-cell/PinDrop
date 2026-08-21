@@ -629,6 +629,16 @@ export function applyEnhancedLayerStyle(map: MapLibreMap, l: Required<MapLayerSt
             maxzoom: 15,
           });
           console.log('[Contour] Vector source added');
+          map.on('sourcedata', (e: any) => {
+            if (e.sourceId === CONTOUR_VECTOR_SOURCE) {
+              console.log('[Contour] Source data event:', e.isSourceLoaded, e.sourceDataType);
+            }
+          });
+          map.on('data', (e: any) => {
+            if (e.sourceId === CONTOUR_VECTOR_SOURCE) {
+              console.log('[Contour] Data event:', e.dataType, e.isSourceLoaded);
+            }
+          });
         } catch (e) {
           console.warn('[Contour] Failed to add vector source:', e);
         }
