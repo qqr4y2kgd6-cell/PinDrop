@@ -697,7 +697,7 @@ export function drawPoiLabelsPdf(
     const p = pois[i];
     const r = laid[i];
     const text = p.name;
-    const textWidth = doc.getTextWidth(text) + style.padding * 2;
+    const textWidth = doc.getTextWidth(text) / MM_TO_PT + style.padding * 2;
     const textHeight = style.fontSize + style.padding * 2;
     const rx = r.x - textWidth / 2;
     const ry = r.y - textHeight - 6;

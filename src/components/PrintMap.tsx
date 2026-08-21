@@ -1026,11 +1026,11 @@ export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
                         <span className="text-xs text-zinc-500 dark:text-zinc-400">Padding</span>
                         <Input
                           type="number"
-                          value={layer('poiLabelPadding')}
+                          value={String(layer('poiLabelPadding'))}
                           onChange={(e) => updateLayers({ poiLabelPadding: parseFloat(e.target.value) || 0 })}
                           min={0}
                           max={10}
-                          step={0.1}
+                          step={0.5}
                           className="text-xs h-7 w-20 px-2"
                         />
                       </div>
@@ -1038,11 +1038,11 @@ export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
                         <span className="text-xs text-zinc-500 dark:text-zinc-400">Radius</span>
                         <Input
                           type="number"
-                          value={layer('poiLabelBorderRadius')}
+                          value={String(layer('poiLabelBorderRadius'))}
                           onChange={(e) => updateLayers({ poiLabelBorderRadius: parseFloat(e.target.value) || 0 })}
                           min={0}
                           max={10}
-                          step={0.1}
+                          step={0.5}
                           className="text-xs h-7 w-20 px-2"
                         />
                       </div>
