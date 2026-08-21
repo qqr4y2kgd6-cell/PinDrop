@@ -725,6 +725,7 @@ export function applyEnhancedLayerStyle(map: MapLibreMap, l: Required<MapLayerSt
     map.setPaintProperty('trail', 'line-color', l.trailColor);
     map.setPaintProperty('trail', 'line-width', visible ? l.trailWidth : 0);
     map.setPaintProperty('trail', 'line-dasharray', l.trailDashArray);
+    map.setPaintProperty('trail', 'line-opacity', visible ? 0.8 : 0);
   }
 
   // Admin boundaries
