@@ -26,6 +26,10 @@ export function PoiLabelOverlay({ map, pois, style, scale = 1 }: PoiLabelOverlay
   const [positions, setPositions] = useState<Array<{ id: string; name: string; x: number; y: number }>>([]);
 
   useEffect(() => {
+    console.log('[PoiLabelOverlay] style changed:', style);
+  }, [style]);
+
+  useEffect(() => {
     if (!map) return;
 
     const update = () => {

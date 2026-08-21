@@ -1012,41 +1012,41 @@ export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
                       {controlRow('Text', layer('poiLabelTextColor'), (c) => updateLayers({ poiLabelTextColor: c }), 1, () => {}, ['1'])}
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-zinc-500 dark:text-zinc-400">Font size</span>
-                        <Input
+                        <input
                           type="number"
-                          value={String(layer('poiLabelFontSize'))}
+                          value={layer('poiLabelFontSize')}
                           onChange={(e) => updateLayers({ poiLabelFontSize: parseFloat(e.target.value) || 0 })}
                           onBlur={(e) => updateLayers({ poiLabelFontSize: parseFloat(e.target.value) || 0 })}
                           min={1}
                           max={20}
                           step={0.5}
-                          className="text-xs h-7 w-20 px-2"
+                          className="text-xs h-7 w-20 px-2 rounded-lg border border-input bg-background"
                         />
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-zinc-500 dark:text-zinc-400">Padding</span>
-                        <Input
+                        <input
                           type="number"
-                          value={String(layer('poiLabelPadding'))}
+                          value={layer('poiLabelPadding')}
                           onChange={(e) => updateLayers({ poiLabelPadding: parseFloat(e.target.value) || 0 })}
                           onBlur={(e) => updateLayers({ poiLabelPadding: parseFloat(e.target.value) || 0 })}
                           min={0}
                           max={10}
                           step={0.5}
-                          className="text-xs h-7 w-20 px-2"
+                          className="text-xs h-7 w-20 px-2 rounded-lg border border-input bg-background"
                         />
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-zinc-500 dark:text-zinc-400">Radius</span>
-                        <Input
+                        <input
                           type="number"
-                          value={String(layer('poiLabelBorderRadius'))}
+                          value={layer('poiLabelBorderRadius')}
                           onChange={(e) => updateLayers({ poiLabelBorderRadius: parseFloat(e.target.value) || 0 })}
                           onBlur={(e) => updateLayers({ poiLabelBorderRadius: parseFloat(e.target.value) || 0 })}
                           min={0}
                           max={10}
                           step={0.5}
-                          className="text-xs h-7 w-20 px-2"
+                          className="text-xs h-7 w-20 px-2 rounded-lg border border-input bg-background"
                         />
                       </div>
                       <div className="flex items-center justify-between">
