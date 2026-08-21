@@ -496,8 +496,8 @@ export function computeScaleBar(
   labelScale = 1,
 ): ScaleBarResult {
   const mpp = (156543.03392 * Math.cos((latitude * Math.PI) / 180)) / Math.pow(2, zoom);
-  // Target ~25 mm on the printed page (CSS_PX_PER_MM = 2 → 50 px at 1:1)
-  const targetBarPx = 50 * labelScale;
+  // Target ~50 mm on the printed page (CSS_PX_PER_MM = 2 → 100 px at 1:1)
+  const targetBarPx = 100 * labelScale;
   const targetBarM = targetBarPx * mpp;
 
   // Pick the nicest total distance ≤ target

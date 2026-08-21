@@ -164,10 +164,10 @@ export function PrintMapFrame({ viewport, isActive, onSelect, onRemove, onUpdate
 
 function ScaleBarSVG({ result, color }: { result: ScaleBarResult; color: string }) {
   const { barMm, ticks } = result;
-  const barWidth = Math.max(8, Math.min(40, barMm));
+  const barWidth = Math.max(8, Math.min(80, barMm));
   const barHeight = 3;
-  const tickHeight = 4;
-  const labelOffset = 5.5;
+  const tickHeight = 2;
+  const labelOffset = 4;
   const totalHeight = labelOffset + tickHeight + 1;
 
   return (
