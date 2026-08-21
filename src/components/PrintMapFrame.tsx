@@ -41,9 +41,10 @@ export function PrintMapFrame({ viewport, isActive, onSelect, onRemove, onUpdate
   // fixed print-height band (TITLE_BAR_MM), matching the export's frame body
   // so a bbox fit shows exactly the same extent in the layout tile and the PDF.
   const titleBarHeight = `${(viewport.titleBarHeight ?? TITLE_BAR_MM) * CSS_PX_PER_MM}px`;
-  // Scale bar
+  // Scale bar & scale text (computed together, rendered independently)
+  const showScaleText = viewport.bbox && (viewport.showScaleText ?? true);
   const showScaleBar = viewport.bbox && (viewport.showScaleBar ?? true);
-  const scaleBar = showScaleBar
+  const scaleBar = (showScaleBar || showScaleText) && viewport.bbox
     ? computeScaleBar(viewport.center[1], viewport.zoom, 1)
     : null;
 
@@ -130,8 +131,8 @@ export function PrintMapFrame({ viewport, isActive, onSelect, onRemove, onUpdate
             )}
             {scaleBar && (
               <span className="shrink-0 text-[0.72em] font-medium normal-case tracking-normal opacity-90 flex items-center gap-1.5" title={`Scale ${scaleBar.scaleText}`}>
-                <ScaleBarSVG result={scaleBar} color={titleTextColor} />
-                {viewport.showScaleText !== false && (
+                {showScaleBar && <ScaleBarSVG result={scaleBar} color={titleTextColor} />}
+                {showScaleText && (
                   <span>{scaleBar.scaleText}</span>
                 )}
               </span>
