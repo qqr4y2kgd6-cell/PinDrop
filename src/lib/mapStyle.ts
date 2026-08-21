@@ -396,7 +396,7 @@ export function repositionPoiLayer(map: MapLibreMap, pois: POI[], spiderify = tr
  * Overlapping badges are spiderified apart with leader lines; positions are
  * recomputed whenever the camera moves.
  */
-export function addPoiLayer(map: MapLibreMap, pois: POI[], mode: ColorMode, spotColor: string, spiderify = true, scale = 1) {
+export function addPoiLayer(map: MapLibreMap, pois: POI[], mode: ColorMode, spotColor: string, spiderify = true, scale = 1, showMarkers = true) {
   const data = createPoiGeoJSON(pois);
   const colors = badgeColors(mode, spotColor);
 
@@ -420,41 +420,46 @@ export function addPoiLayer(map: MapLibreMap, pois: POI[], mode: ColorMode, spot
     });
   }
 
-  if (!map.getLayer('poi-badges')) {
-    map.addLayer({
-      id: 'poi-badges',
-      type: 'circle',
-      source: POI_SOURCE,
-      paint: {
-        'circle-radius': 8 * scale,
-        'circle-color': colors.fill,
-        'circle-stroke-color': '#ffffff',
-        'circle-stroke-width': 2 * scale,
-      },
-    });
-    map.addLayer({
-      id: 'poi-numbers',
-      type: 'symbol',
-      source: POI_SOURCE,
-      layout: {
-        'text-field': ['get', 'number'],
-        'text-font': ['Noto Sans Bold'],
-        'text-size': 9 * scale,
-        'text-allow-overlap': true,
-      },
-      paint: {
-        'text-color': colors.text,
-        'text-halo-color': colors.fill,
-        'text-halo-width': 0.5,
-      },
-    });
+  if (showMarkers) {
+    if (!map.getLayer('poi-badges')) {
+      map.addLayer({
+        id: 'poi-badges',
+        type: 'circle',
+        source: POI_SOURCE,
+        paint: {
+          'circle-radius': 8 * scale,
+          'circle-color': colors.fill,
+          'circle-stroke-color': '#ffffff',
+          'circle-stroke-width': 2 * scale,
+        },
+      });
+      map.addLayer({
+        id: 'poi-numbers',
+        type: 'symbol',
+        source: POI_SOURCE,
+        layout: {
+          'text-field': ['get', 'number'],
+          'text-font': ['Noto Sans Bold'],
+          'text-size': 9 * scale,
+          'text-allow-overlap': true,
+        },
+        paint: {
+          'text-color': colors.text,
+          'text-halo-color': colors.fill,
+          'text-halo-width': 0.5,
+        },
+      });
+    } else {
+      map.setPaintProperty('poi-badges', 'circle-radius', 8 * scale);
+      map.setPaintProperty('poi-badges', 'circle-color', colors.fill);
+      map.setPaintProperty('poi-badges', 'circle-stroke-width', 2 * scale);
+      map.setLayoutProperty('poi-numbers', 'text-size', 9 * scale);
+      map.setPaintProperty('poi-numbers', 'text-color', colors.text);
+      map.setPaintProperty('poi-numbers', 'text-halo-color', colors.fill);
+      setLayerVisibility(map, ['poi-badges', 'poi-numbers'], true);
+    }
   } else {
-    map.setPaintProperty('poi-badges', 'circle-radius', 8 * scale);
-    map.setPaintProperty('poi-badges', 'circle-color', colors.fill);
-    map.setPaintProperty('poi-badges', 'circle-stroke-width', 2 * scale);
-    map.setLayoutProperty('poi-numbers', 'text-size', 9 * scale);
-    map.setPaintProperty('poi-numbers', 'text-color', colors.text);
-    map.setPaintProperty('poi-numbers', 'text-halo-color', colors.fill);
+    setLayerVisibility(map, ['poi-badges', 'poi-numbers'], false);
   }
 
   const onReposition = () => repositionPoiLayer(map, pois, spiderify, scale);
@@ -801,10 +806,11 @@ export const DEFAULT_LAYER_STYLE: Required<MapLayerStyle> = {
   showPoiLabels: false,
   poiLabelBgColor: '#ffffff',
   poiLabelTextColor: '#1a1a1a',
-  poiLabelFontSize: 12,
-  poiLabelPadding: 4,
-  poiLabelBorderRadius: 4,
+  poiLabelFontSize: 3,
+  poiLabelPadding: 0.5,
+  poiLabelBorderRadius: 0.3,
   poiLabelShadow: true,
+  showPoiMarkers: true,
 };
 
 function setLayerVisibility(map: MapLibreMap, ids: string[], visible: boolean) {

@@ -1,14 +1,17 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { Map } from 'maplibre-gl';
+import { CSS_PX_PER_MM } from '@/lib/units';
+
+const MM_TO_PX = CSS_PX_PER_MM;
 
 export interface PoiLabelStyle {
   bgColor: string;
   textColor: string;
-  fontSize: number; // px
-  padding: number; // px
-  borderRadius: number; // px
+  fontSize: number; // mm
+  padding: number; // mm
+  borderRadius: number; // mm
   showShadow: boolean;
 }
 
@@ -57,6 +60,12 @@ export function PoiLabelOverlay({ map, pois, style, scale = 1 }: PoiLabelOverlay
 
   if (!map || positions.length === 0) return null;
 
+  const fontSizePx = style.fontSize * MM_TO_PX * scale;
+  const paddingYPx = style.padding * MM_TO_PX * scale;
+  const paddingXPx = style.padding * 1.5 * MM_TO_PX * scale;
+  const borderRadiusPx = style.borderRadius * MM_TO_PX * scale;
+  const arrowSize = Math.max(3, 5 * scale);
+
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden">
       {positions.map((p) => (
@@ -73,9 +82,9 @@ export function PoiLabelOverlay({ map, pois, style, scale = 1 }: PoiLabelOverlay
             style={{
               backgroundColor: style.bgColor,
               color: style.textColor,
-              fontSize: style.fontSize,
-              padding: `${style.padding}px ${style.padding * 1.5}px`,
-              borderRadius: style.borderRadius,
+              fontSize: fontSizePx,
+              padding: `${paddingYPx} ${paddingXPx}`,
+              borderRadius: borderRadiusPx,
               boxShadow: style.showShadow ? '0 1px 3px rgba(0,0,0,0.2)' : 'none',
               fontFamily: 'system-ui, sans-serif',
               lineHeight: '1.2',
@@ -88,9 +97,9 @@ export function PoiLabelOverlay({ map, pois, style, scale = 1 }: PoiLabelOverlay
             style={{
               width: 0,
               height: 0,
-              borderLeft: '5px solid transparent',
-              borderRight: '5px solid transparent',
-              borderTop: `5px solid ${style.bgColor}`,
+              borderLeft: `${arrowSize}px solid transparent`,
+              borderRight: `${arrowSize}px solid transparent`,
+              borderTop: `${arrowSize} solid ${style.bgColor}`,
               margin: '0 auto',
             }}
           />

@@ -184,6 +184,7 @@ export interface MapLayerStyle {
   poiLabelPadding?: number;
   poiLabelBorderRadius?: number;
   poiLabelShadow?: boolean;
+  showPoiMarkers?: boolean;
 }
 
 export interface PlaceNameTierStyle {

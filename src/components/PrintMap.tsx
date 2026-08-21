@@ -315,7 +315,7 @@ export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
     mapRef.current = map;
 
     const onStyleReady = () => {
-      addPoiLayer(map, viewportActivePois(pois, viewport), colorMode, spotColor, viewport.spiderify !== false, viewport.poiMarkerScale ?? 1);
+      addPoiLayer(map, viewportActivePois(pois, viewport), colorMode, spotColor, viewport.spiderify !== false, viewport.poiMarkerScale ?? 1, viewport.layers?.showPoiMarkers ?? true);
       applyLayerStyleOverrides(map, viewport?.layers, EDITOR_LABEL_SCALE);
       if (viewport?.layers) {
         const l = { ...DEFAULT_LAYER_STYLE, ...viewport.layers };
@@ -426,9 +426,9 @@ export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
     if (!map || !viewport) return;
     const vpPois = viewportActivePois(pois, viewport);
     if (map.isStyleLoaded()) {
-      addPoiLayer(map, vpPois, colorMode, spotColor, viewport.spiderify !== false, viewport.poiMarkerScale ?? 1);
+      addPoiLayer(map, vpPois, colorMode, spotColor, viewport.spiderify !== false, viewport.poiMarkerScale ?? 1, viewport.layers?.showPoiMarkers ?? true);
     } else {
-      map.once('style.load', () => addPoiLayer(map, vpPois, colorMode, spotColor, viewport.spiderify !== false, viewport.poiMarkerScale ?? 1));
+      map.once('style.load', () => addPoiLayer(map, vpPois, colorMode, spotColor, viewport.spiderify !== false, viewport.poiMarkerScale ?? 1, viewport.layers?.showPoiMarkers ?? true));
     }
   }, [pois, colorMode, spotColor, viewport?.id, viewport?.visiblePoiIds, viewport?.spiderify, viewport?.poiMarkerScale]);
 
@@ -1016,11 +1016,11 @@ export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="10">10</SelectItem>
-                            <SelectItem value="12">12</SelectItem>
-                            <SelectItem value="14">14</SelectItem>
-                            <SelectItem value="16">16</SelectItem>
-                            <SelectItem value="18">18</SelectItem>
+                            <SelectItem value="2">2</SelectItem>
+                            <SelectItem value="3">3</SelectItem>
+                            <SelectItem value="4">4</SelectItem>
+                            <SelectItem value="5">5</SelectItem>
+                            <SelectItem value="6">6</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -1031,10 +1031,10 @@ export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="2">2</SelectItem>
-                            <SelectItem value="4">4</SelectItem>
-                            <SelectItem value="6">6</SelectItem>
-                            <SelectItem value="8">8</SelectItem>
+                            <SelectItem value="0.3">0.3</SelectItem>
+                            <SelectItem value="0.5">0.5</SelectItem>
+                            <SelectItem value="0.8">0.8</SelectItem>
+                            <SelectItem value="1">1</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -1046,16 +1046,19 @@ export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="0">0</SelectItem>
-                            <SelectItem value="2">2</SelectItem>
-                            <SelectItem value="4">4</SelectItem>
-                            <SelectItem value="6">6</SelectItem>
-                            <SelectItem value="8">8</SelectItem>
+                            <SelectItem value="0.2">0.2</SelectItem>
+                            <SelectItem value="0.3">0.3</SelectItem>
+                            <SelectItem value="0.5">0.5</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-zinc-500 dark:text-zinc-400">Shadow</span>
                         <Switch checked={layer('poiLabelShadow')} onCheckedChange={(c) => updateLayers({ poiLabelShadow: c })} />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-zinc-500 dark:text-zinc-400">Show markers</span>
+                        <Switch checked={layer('showPoiMarkers')} onCheckedChange={(c) => updateLayers({ showPoiMarkers: c })} />
                       </div>
                     </div>
                   )}

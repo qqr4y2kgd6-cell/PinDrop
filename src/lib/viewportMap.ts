@@ -54,7 +54,7 @@ export interface ViewportStyleOptions {
 /** Attaches the POI markers for a viewport. */
 export function addViewportPois(map: Map, opts: Pick<ViewportStyleOptions, 'viewport' | 'pois' | 'colorMode' | 'spotColor'>) {
   const { viewport, pois, colorMode, spotColor } = opts;
-  addPoiLayer(map, viewportActivePois(pois, viewport), colorMode, spotColor, viewport.spiderify !== false, viewport.poiMarkerScale ?? 1);
+  addPoiLayer(map, viewportActivePois(pois, viewport), colorMode, spotColor, viewport.spiderify !== false, viewport.poiMarkerScale ?? 1, viewport.layers?.showPoiMarkers ?? true);
 }
 
 /** Fits a bbox viewport exactly, mirroring the layout tiles' framing. */
