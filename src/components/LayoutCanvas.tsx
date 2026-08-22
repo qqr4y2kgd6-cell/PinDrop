@@ -787,10 +787,10 @@ function PageCanvas({
   const prevCountsRef = useRef({ vps: page.viewports.length, indexes: page.indexLists.length, tbs: page.titleBlocks.length });
 
   useEffect(() => {
-    if (skipSyncRef.current) { skipSyncRef.current = false; return; }
     const prev = prevCountsRef.current;
     const cur = { vps: page.viewports.length, indexes: page.indexLists.length, tbs: page.titleBlocks.length };
-    if (prev.vps === cur.vps && prev.indexes === cur.indexes && prev.tbs === cur.tbs) return;
+    const countsChanged = prev.vps !== cur.vps || prev.indexes !== cur.indexes || prev.tbs !== cur.tbs;
+    if (!countsChanged && skipSyncRef.current) { skipSyncRef.current = false; return; }
     prevCountsRef.current = cur;
     const items: GridItem[] = page.viewports.map(viewportToItem);
     items.push(...page.indexLists.map(indexToItem));
