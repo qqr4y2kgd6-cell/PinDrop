@@ -104,18 +104,22 @@ export function PoiLabelOverlay({ map, pois, style, scale = 1 }: PoiLabelOverlay
               boxSizing: 'border-box',
               padding: 0,
               display: 'inline-flex',
-              alignItems: 'center',
-              gap: 0,
+              flexDirection: 'column',
+              alignItems: 'stretch',
             }}
           >
-            <div style={{ width: paddingXPx, flexShrink: 0 }} />
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              {p.name}
-              <span style={{ fontSize: '9px', opacity: 0.6 }}>
-                pad={style.padding.toFixed(1)} font={style.fontSize.toFixed(1)} rad={style.borderRadius.toFixed(1)} | py={paddingYPx.toFixed(0)}px px={paddingXPx.toFixed(0)}px
-              </span>
+            <div style={{ height: paddingYPx, backgroundColor: 'transparent' }} />
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <div style={{ width: paddingXPx, flexShrink: 0, backgroundColor: 'transparent' }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                {p.name}
+                <span style={{ fontSize: '9px', opacity: 0.6 }}>
+                  pad={style.padding.toFixed(1)} font={style.fontSize.toFixed(1)} rad={style.borderRadius.toFixed(1)} | py={paddingYPx.toFixed(0)}px px={paddingXPx.toFixed(0)}px
+                </span>
+              </div>
+              <div style={{ width: paddingXPx, flexShrink: 0, backgroundColor: 'transparent' }} />
             </div>
-            <div style={{ width: paddingXPx, flexShrink: 0 }} />
+            <div style={{ height: paddingYPx, backgroundColor: 'transparent' }} />
           </div>
           <div
             style={{
