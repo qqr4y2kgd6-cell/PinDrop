@@ -3,12 +3,14 @@
 import { useEffect, useState } from 'react';
 import { Map } from 'maplibre-gl';
 import { CSS_PX_PER_MM } from '@/lib/units';
+import { placeNameFontCss } from '@/lib/placeNameFonts';
 
 const MM_TO_PX = CSS_PX_PER_MM;
 
 export interface PoiLabelStyle {
   bgColor: string;
   textColor: string;
+  fontFamily?: string;
   fontSize: number; // mm
   padding: number; // mm
   borderRadius: number; // mm
@@ -80,11 +82,11 @@ export function PoiLabelOverlay({ map, pois, style, scale = 1 }: PoiLabelOverlay
             style={{
               backgroundColor: style.bgColor,
               color: style.textColor,
+              fontFamily: placeNameFontCss(style.fontFamily),
               fontSize: fontSizePx,
               padding: `${style.padding * MM_TO_PX * scale}px ${style.padding * 1.5 * MM_TO_PX * scale}px`,
               borderRadius: borderRadiusPx,
               boxShadow: style.showShadow ? '0 1px 3px rgba(0,0,0,0.2)' : 'none',
-              fontFamily: 'system-ui, sans-serif',
               lineHeight: '1.2',
               whiteSpace: 'nowrap',
             }}

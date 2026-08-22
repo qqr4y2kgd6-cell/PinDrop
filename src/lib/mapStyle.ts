@@ -809,6 +809,7 @@ export const DEFAULT_LAYER_STYLE: Required<MapLayerStyle> = {
   showPoiLabels: false,
   poiLabelBgColor: '#ffffff',
   poiLabelTextColor: '#1a1a1a',
+  poiLabelFontFamily: 'Inter',
   poiLabelFontSize: 3,
   poiLabelPadding: 2,
   poiLabelBorderRadius: 0.3,

@@ -508,6 +508,7 @@ export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
                 style={{
                   bgColor: layer('poiLabelBgColor'),
                   textColor: layer('poiLabelTextColor'),
+                  fontFamily: layer('poiLabelFontFamily') || undefined,
                   fontSize: layer('poiLabelFontSize'),
                   padding: layer('poiLabelPadding'),
                   borderRadius: layer('poiLabelBorderRadius'),
@@ -1009,6 +1010,21 @@ export function PrintMap({ viewport, onViewportChange }: PrintMapProps) {
                     <div className="flex flex-col gap-1.5 pl-1">
                       {controlRow('Background', layer('poiLabelBgColor'), (c) => updateLayers({ poiLabelBgColor: c }), 1, () => {}, ['1'])}
                       {controlRow('Text', layer('poiLabelTextColor'), (c) => updateLayers({ poiLabelTextColor: c }), 1, () => {}, ['1'])}
+                      <div className="flex flex-col gap-1">
+                        <Label className="text-xs text-zinc-500">Font</Label>
+                        <Select value={layer('poiLabelFontFamily') ?? 'Inter'} onValueChange={(v: string | null) => updateLayers({ poiLabelFontFamily: v ?? undefined })}>
+                          <SelectTrigger className="text-xs h-7 px-2">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {PLACE_NAME_FONTS.map((f) => (
+                              <SelectItem key={f.id} value={f.id}>
+                                {f.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-zinc-500 dark:text-zinc-400">Font size</span>
                         <input

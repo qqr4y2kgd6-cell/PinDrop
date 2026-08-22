@@ -180,6 +180,7 @@ export interface MapLayerStyle {
   showPoiLabels?: boolean;
   poiLabelBgColor?: string;
   poiLabelTextColor?: string;
+  poiLabelFontFamily?: string;
   poiLabelFontSize?: number;
   poiLabelPadding?: number;
   poiLabelBorderRadius?: number;
