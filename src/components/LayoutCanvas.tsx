@@ -481,126 +481,128 @@ export function LayoutCanvas({
         </div>
       </div>
 
-      <div className="flex-1 flex overflow-hidden">
-        {/* Pages canvas */}
-        <div
-          ref={scrollRef}
-          onClick={clearOnEmptyClick}
-          className={`flex-1 flex items-start gap-12 overflow-auto p-6 select-none ${isPanning ? 'cursor-grabbing' : spacePressed ? 'cursor-grab' : 'cursor-default'}`}
-          style={{ background: '#4b5563', touchAction: 'pan-x pan-y' }}
-        >
-          {pages.map((page) => (
-            <PageCanvas
-              key={page.id}
-              page={page}
-              isActive={activePageId === page.id}
-              showFoldLines={showFoldLines}
-              zoom={paperZoom}
-              activeViewportId={activeViewportId}
-              onSelectPage={onSetActivePageId}
-              onViewportSelect={onViewportSelect}
-              onOpenEditor={onOpenEditor}
-              onPageViewportUpdate={onPageViewportUpdate}
-              onPageViewportRemove={onPageViewportRemove}
-              onPageIndexUpdate={onPageIndexUpdate}
-              onPageIndexRemove={onPageIndexRemove}
-              onPageTitleBlockUpdate={onPageTitleBlockUpdate}
-              onPageTitleBlockRemove={onPageTitleBlockRemove}
-            />
-          ))}
-          {pages.length === 0 && (
-            <div className="mt-24 flex flex-col items-center gap-3 text-zinc-300">
-              <p className="text-sm">No pages yet</p>
-              <Button variant="outline" size="sm" onClick={onAddPage}>
-                <FilePlus2 className="h-4 w-4 mr-1" /> Add Page
-              </Button>
-            </div>
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 flex overflow-hidden">
+          {/* Pages canvas */}
+          <div
+            ref={scrollRef}
+            onClick={clearOnEmptyClick}
+            className={`flex-1 flex items-start gap-12 overflow-auto p-6 select-none ${isPanning ? 'cursor-grabbing' : spacePressed ? 'cursor-grab' : 'cursor-default'}`}
+            style={{ background: '#4b5563', touchAction: 'pan-x pan-y' }}
+          >
+            {pages.map((page) => (
+              <PageCanvas
+                key={page.id}
+                page={page}
+                isActive={activePageId === page.id}
+                showFoldLines={showFoldLines}
+                zoom={paperZoom}
+                activeViewportId={activeViewportId}
+                onSelectPage={onSetActivePageId}
+                onViewportSelect={onViewportSelect}
+                onOpenEditor={onOpenEditor}
+                onPageViewportUpdate={onPageViewportUpdate}
+                onPageViewportRemove={onPageViewportRemove}
+                onPageIndexUpdate={onPageIndexUpdate}
+                onPageIndexRemove={onPageIndexRemove}
+                onPageTitleBlockUpdate={onPageTitleBlockUpdate}
+                onPageTitleBlockRemove={onPageTitleBlockRemove}
+              />
+            ))}
+            {pages.length === 0 && (
+              <div className="mt-24 flex flex-col items-center gap-3 text-zinc-300">
+                <p className="text-sm">No pages yet</p>
+                <Button variant="outline" size="sm" onClick={onAddPage}>
+                  <FilePlus2 className="h-4 w-4 mr-1" /> Add Page
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {/* Inspector */}
+          {showInspector ? (
+            <aside className="
+              flex min-h-0 w-72 shrink-0 flex-col border-l border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950
+              fixed md:relative bottom-0 left-0 right-0 md:bottom-auto md:left-auto md:right-auto
+              h-[50vh] md:h-auto max-h-[50vh] md:max-h-none
+              border-t md:border-t-0 border-l-0 md:border-l z-30 md:z-auto
+            ">
+              <div className="flex items-center justify-between border-b border-zinc-200 px-3 py-2 dark:border-zinc-800">
+                <span className="flex items-center gap-1.5 text-xs font-semibold text-zinc-700 dark:text-zinc-200">
+                  <PanelRight className="h-3.5 w-3.5" />
+                  Inspector
+                </span>
+                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setShowInspector(false)} title="Minimize inspector">
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+              <CardContent className="flex-1 min-h-0 overflow-y-auto p-3 flex flex-col gap-2.5">
+                {selectedIndex ? (
+                  <>
+                    <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-200">Index List</p>
+                    <IndexListProperties
+                      page={activePage}
+                      config={selectedIndex}
+                      onUpdate={(updates) => onPageIndexUpdate(pageId, selectedIndex.id, updates)}
+                    />
+                    <Button variant="destructive" size="sm" className="h-8 w-full text-xs"
+                      onClick={() => {
+                        onPageIndexRemove(pageId, selectedIndex.id);
+                        if (activeViewportId === indexItemId(selectedIndex.id)) onViewportSelect(null);
+                      }}
+                    >
+                      <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete Index List
+                    </Button>
+                  </>
+                ) : selectedTitleBlock ? (
+                  <>
+                    <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-200">Title Block</p>
+                    <TitleBlockProperties
+                      page={activePage}
+                      config={selectedTitleBlock}
+                      onUpdate={(updates) => onPageTitleBlockUpdate(pageId, selectedTitleBlock.id, updates)}
+                    />
+                    <Button variant="destructive" size="sm" className="h-8 w-full text-xs"
+                      onClick={() => {
+                        onPageTitleBlockRemove(pageId, selectedTitleBlock.id);
+                        if (activeViewportId === tbItemId(selectedTitleBlock.id)) onViewportSelect(null);
+                      }}
+                    >
+                      <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete Title Block
+                    </Button>
+                  </>
+                ) : selectedVp ? (
+                  <>
+                    <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-200">{selectedVp.title}</p>
+                    <ViewportProperties
+                      viewport={selectedVp}
+                      page={pages.find((p) => p.viewports.some((v) => v.id === selectedVp.id)) ?? activePage}
+                      onUpdate={(id, updates) => {
+                        const owner = pages.find((p) => p.viewports.some((v) => v.id === id));
+                        if (owner) onPageViewportUpdate(owner.id, id, updates);
+                      }}
+                    />
+                  </>
+                ) : (
+                  <div className="rounded-xl border border-dashed border-zinc-300 p-4 text-center text-xs text-zinc-400 dark:border-zinc-700 dark:text-zinc-500">
+                    Select a map frame, index list, or title block to edit its properties.
+                  </div>
+                )}
+              </CardContent>
+            </aside>
+          ) : (
+            <Button
+              variant="outline"
+              size="icon"
+              className="fixed bottom-4 right-4 z-40 h-10 w-10 rounded-full shadow-md md:relative md:bottom-auto md:right-auto md:z-auto md:h-8 md:w-8 md:rounded-none md:shadow-none md:border-l md:border-t-0 md:border-b md:border-r border-zinc-200 bg-white dark:bg-zinc-950 dark:border-zinc-800"
+              onClick={() => setShowInspector(true)}
+              title="Show inspector"
+            >
+              <PanelRightOpen className="h-4 w-4" />
+            </Button>
           )}
         </div>
 
-        {/* Inspector */}
-        {showInspector ? (
-          <aside className="
-            flex min-h-0 w-72 shrink-0 flex-col border-l border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950
-            fixed md:relative bottom-0 left-0 right-0 md:bottom-auto md:left-auto md:right-auto
-            h-[50vh] md:h-auto max-h-[50vh] md:max-h-none
-            border-t md:border-t-0 border-l-0 md:border-l z-30 md:z-auto
-          ">
-            <div className="flex items-center justify-between border-b border-zinc-200 px-3 py-2 dark:border-zinc-800">
-              <span className="flex items-center gap-1.5 text-xs font-semibold text-zinc-700 dark:text-zinc-200">
-                <PanelRight className="h-3.5 w-3.5" />
-                Inspector
-              </span>
-              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setShowInspector(false)} title="Minimize inspector">
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-            <CardContent className="flex-1 min-h-0 overflow-y-auto p-3 flex flex-col gap-2.5">
-              {selectedIndex ? (
-                <>
-                  <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-200">Index List</p>
-                  <IndexListProperties
-                    page={activePage}
-                    config={selectedIndex}
-                    onUpdate={(updates) => onPageIndexUpdate(pageId, selectedIndex.id, updates)}
-                  />
-                  <Button variant="destructive" size="sm" className="h-8 w-full text-xs"
-                    onClick={() => {
-                      onPageIndexRemove(pageId, selectedIndex.id);
-                      if (activeViewportId === indexItemId(selectedIndex.id)) onViewportSelect(null);
-                    }}
-                  >
-                    <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete Index List
-                  </Button>
-                </>
-              ) : selectedTitleBlock ? (
-                <>
-                  <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-200">Title Block</p>
-                  <TitleBlockProperties
-                    page={activePage}
-                    config={selectedTitleBlock}
-                    onUpdate={(updates) => onPageTitleBlockUpdate(pageId, selectedTitleBlock.id, updates)}
-                  />
-                  <Button variant="destructive" size="sm" className="h-8 w-full text-xs"
-                    onClick={() => {
-                      onPageTitleBlockRemove(pageId, selectedTitleBlock.id);
-                      if (activeViewportId === tbItemId(selectedTitleBlock.id)) onViewportSelect(null);
-                    }}
-                  >
-                    <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete Title Block
-                  </Button>
-                </>
-              ) : selectedVp ? (
-                <>
-                  <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-200">{selectedVp.title}</p>
-                  <ViewportProperties
-                    viewport={selectedVp}
-                    page={pages.find((p) => p.viewports.some((v) => v.id === selectedVp.id)) ?? activePage}
-                    onUpdate={(id, updates) => {
-                      const owner = pages.find((p) => p.viewports.some((v) => v.id === id));
-                      if (owner) onPageViewportUpdate(owner.id, id, updates);
-                    }}
-                  />
-                </>
-              ) : (
-                <div className="rounded-xl border border-dashed border-zinc-300 p-4 text-center text-xs text-zinc-400 dark:border-zinc-700 dark:text-zinc-500">
-                  Select a map frame, index list, or title block to edit its properties.
-                </div>
-              )}
-            </CardContent>
-          </aside>
-        ) : (
-          <Button
-            variant="outline"
-            size="icon"
-            className="fixed bottom-4 right-4 z-40 h-10 w-10 rounded-full shadow-md md:relative md:bottom-auto md:right-auto md:z-auto md:h-8 md:w-8 md:rounded-none md:shadow-none md:border-l md:border-t-0 md:border-b md:border-r border-zinc-200 bg-white dark:bg-zinc-950 dark:border-zinc-800"
-            onClick={() => setShowInspector(true)}
-            title="Show inspector"
-          >
-            <PanelRightOpen className="h-4 w-4" />
-          </Button>
-        )}
-        
         {/* Page strip */}
         <PageStrip
           pages={pages}
