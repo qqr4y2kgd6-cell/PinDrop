@@ -9,7 +9,7 @@ export function CanvasArea() {
   const {
     layout, pages, activePageId, activeViewportId, setActiveViewportId,
     updateViewport, setActivePageId, addPage, removePage, renamePage,
-    updatePage, updatePageViewport, addPageViewport, removePageViewport,
+    updatePageViewport, addPageViewport, removePageViewport,
     addPageIndexList, updatePageIndexList, removePageIndexList,
     addPageTitleBlock, updatePageTitleBlock, removePageTitleBlock,
     activeTab, setActiveTab,
@@ -39,7 +39,6 @@ export function CanvasArea() {
             onAddPage={addPage}
             onRemovePage={removePage}
             onRenamePage={renamePage}
-            onPageLayoutUpdate={updatePage}
             onPageViewportUpdate={updatePageViewport}
             onPageViewportAdd={addPageViewport}
             onPageViewportRemove={removePageViewport}

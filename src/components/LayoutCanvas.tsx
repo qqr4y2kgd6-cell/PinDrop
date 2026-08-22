@@ -203,7 +203,6 @@ interface LayoutCanvasProps {
   onAddPage: () => void;
   onRemovePage: (id: string) => void;
   onRenamePage: (id: string, name: string) => void;
-  onPageLayoutUpdate: (pageId: string, updates: Partial<PrintLayout>) => void;
   onPageViewportUpdate: (pageId: string, viewportId: string, updates: Partial<MapViewport>) => void;
   onPageViewportAdd: (pageId: string, viewport: MapViewport) => void;
   onPageViewportRemove: (pageId: string, viewportId: string) => void;
@@ -226,7 +225,6 @@ export function LayoutCanvas({
   onAddPage,
   onRemovePage,
   onRenamePage,
-  onPageLayoutUpdate,
   onPageViewportUpdate,
   onPageViewportAdd,
   onPageViewportRemove,
@@ -239,7 +237,6 @@ export function LayoutCanvas({
   onOpenEditor,
 }: LayoutCanvasProps) {
   const [paperZoom, setPaperZoom] = useState(1);
-  const [showPageSettings, setShowPageSettings] = useState(true);
   const [showInspector, setShowInspector] = useState(true);
   const [showFoldLines, setShowFoldLines] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
@@ -475,11 +472,8 @@ export function LayoutCanvas({
           <Button
             variant="outline"
             size="sm"
-            onClick={() => {
-              setShowInspector(true);
-              setShowPageSettings((v) => !v);
-            }}
-            className={showPageSettings ? 'bg-blue-100 dark:bg-blue-900/30' : ''}
+            onClick={() => setShowInspector(true)}
+            className=""
           >
             <Settings className="h-4 w-4 mr-1" />
             Layout
@@ -552,13 +546,6 @@ export function LayoutCanvas({
               </Button>
             </div>
             <CardContent className="flex-1 min-h-0 overflow-y-auto p-3 flex flex-col gap-2.5">
-              {showPageSettings && (
-                <>
-                  <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-200">Page</p>
-                  <PageSettings page={activePage} onUpdate={(u) => onPageLayoutUpdate(pageId, u)} />
-                </>
-              )}
-
               {selectedIndex ? (
                 <>
                   <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-200">Index List</p>
@@ -1355,142 +1342,6 @@ function PositionFields({ pos, onChange }: { pos: Rect; onChange: (partial: Part
       <div className="flex flex-col gap-1">
         <span className="text-xs text-zinc-500 dark:text-zinc-400">Height (mm)</span>
         <Num value={pos.height} onChange={(v) => onChange({ height: Math.max(5, v) })} min={5} step={5} />
-      </div>
-    </div>
-  );
-}
-
-function PageSettings({ page, onUpdate }: { page: PrintLayout; onUpdate: (u: Partial<PrintLayout>) => void }) {
-  const setMargin = (key: keyof NonNullable<PrintLayout['pageMargins']>, value: number) =>
-    onUpdate({ pageMargins: { top: page.pageMargins?.top ?? 10, right: page.pageMargins?.right ?? 10, bottom: page.pageMargins?.bottom ?? 10, left: page.pageMargins?.left ?? 10, [key]: value } });
-
-  return (
-    <div className="flex flex-col gap-2">
-      <div className="flex flex-col gap-1">
-        <span className="text-xs text-zinc-500 dark:text-zinc-400">Paper color</span>
-        <ColorPicker color={page.paperColor ?? '#ffffff'} onChange={(c) => onUpdate({ paperColor: c })} />
-      </div>
-      <div className="flex flex-col gap-1">
-        <span className="text-xs text-zinc-500 dark:text-zinc-400">Spot color</span>
-        <ColorPicker color={page.spotColor} onChange={(c) => onUpdate({ spotColor: c })} />
-      </div>
-      <div className="flex flex-col gap-1">
-        <span className="text-xs text-zinc-500 dark:text-zinc-400">Margins (mm)</span>
-        <div className="grid grid-cols-4 gap-1.5">
-          {(['top', 'right', 'bottom', 'left'] as const).map((m) => (
-            <Num key={m} value={page.pageMargins?.[m] ?? 10} onChange={(v) => setMargin(m, v)} min={0} max={60} />
-          ))}
-        </div>
-      </div>
-      <div className="flex flex-col gap-1">
-        <span className="text-xs text-zinc-500 dark:text-zinc-400">Item spacing (mm)</span>
-        <Num value={page.itemSpacing ?? 5} onChange={(v) => onUpdate({ itemSpacing: v })} min={0} max={20} />
-      </div>
-      <div className="flex items-center gap-2">
-        <Switch checked={page.snapToFold !== false} onCheckedChange={(c) => onUpdate({ snapToFold: c })} />
-        <span className="text-xs text-zinc-600 dark:text-zinc-300">Snap to fold grid</span>
-      </div>
-      <Separator />
-      <FontGroup
-        family={page.titleFontFamily ?? 'Helvetica'}
-        size={page.titleFontSize ?? 3}
-        weight={page.titleFontWeight ?? 'bold'}
-        onFamily={(v) => onUpdate({ titleFontFamily: v })}
-        onSize={(v) => onUpdate({ titleFontSize: v })}
-        onWeight={(v) => onUpdate({ titleFontWeight: v })}
-        onReset={() => onUpdate({ titleFontFamily: undefined, titleFontSize: undefined, titleFontWeight: undefined })}
-      />
-      <div className="flex flex-col gap-1">
-        <span className="text-xs text-zinc-500 dark:text-zinc-400">Default title background</span>
-        <ColorPicker color={page.defaultTitleBackgroundColor ?? page.spotColor} onChange={(c) => onUpdate({ defaultTitleBackgroundColor: c })} />
-      </div>
-      <div className="flex flex-col gap-1">
-        <span className="text-xs text-zinc-500 dark:text-zinc-400">Default title text color</span>
-        <ColorPicker color={page.defaultTitleTextColor ?? '#ffffff'} onChange={(c) => onUpdate({ defaultTitleTextColor: c })} />
-      </div>
-      <Separator />
-      <span className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-200">Map settings</span>
-      <div className="flex flex-col gap-1">
-        <span className="text-xs text-zinc-500 dark:text-zinc-400">Glyphs server URL</span>
-        <Input
-          value={page.glyphsUrl ?? ''}
-          placeholder="Default (OpenFreeMap)"
-          onChange={(e) => onUpdate({ glyphsUrl: e.target.value || undefined })}
-          className="h-7 text-xs"
-        />
-      </div>
-      <p className="text-[10px] text-zinc-400 leading-tight">
-        For more fonts, use: tiles.openstreetmap.us/fonts/{'{fontstack}'}/{'{range}'}.pbf
-      </p>
-      <Separator />
-      <span className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-200">Index list defaults</span>
-      <div className="flex flex-col gap-1">
-        <span className="text-xs text-zinc-500 dark:text-zinc-400">Default columns</span>
-        <Num value={page.indexColumns ?? 2} onChange={(v) => onUpdate({ indexColumns: Math.max(1, Math.round(v) || 1) })} min={1} max={6} />
-      </div>
-      <div className="grid grid-cols-2 gap-2">
-        <div className="flex flex-col gap-1">
-          <span className="text-xs text-zinc-500 dark:text-zinc-400">Default border width (mm)</span>
-          <Num value={page.indexListBorderWidth ?? 1} onChange={(v) => onUpdate({ indexListBorderWidth: v })} min={0} step={0.5} />
-        </div>
-        <div className="flex flex-col gap-1">
-          <span className="text-xs text-zinc-500 dark:text-zinc-400">Default corner radius (mm)</span>
-          <Num value={page.indexListCornerRadius ?? 4} onChange={(v) => onUpdate({ indexListCornerRadius: v })} min={0} />
-        </div>
-        <div className="flex flex-col gap-1">
-          <span className="text-xs text-zinc-500 dark:text-zinc-400">Default border color</span>
-          <ColorPicker color={page.indexListBorderColor ?? '#000000'} onChange={(c) => onUpdate({ indexListBorderColor: c })} />
-        </div>
-        <div className="flex flex-col gap-1">
-          <span className="text-xs text-zinc-500 dark:text-zinc-400">Default background</span>
-          <ColorPicker color={page.indexListBackgroundColor ?? '#ffffff'} onChange={(c) => onUpdate({ indexListBackgroundColor: c })} />
-        </div>
-        <div className="flex flex-col gap-1">
-          <span className="text-xs text-zinc-500 dark:text-zinc-400">Default title background</span>
-          <ColorPicker color={page.indexListTitleBackgroundColor ?? page.defaultTitleBackgroundColor ?? page.spotColor} onChange={(c) => onUpdate({ indexListTitleBackgroundColor: c })} />
-        </div>
-        <div className="flex flex-col gap-1">
-          <span className="text-xs text-zinc-500 dark:text-zinc-400">Default title text color</span>
-          <ColorPicker color={page.indexListTitleTextColor ?? '#ffffff'} onChange={(c) => onUpdate({ indexListTitleTextColor: c })} />
-        </div>
-      </div>
-      <div className="grid grid-cols-2 gap-2">
-        <div className="flex flex-col gap-1">
-          <span className="text-xs text-zinc-500 dark:text-zinc-400">Padding top (mm)</span>
-          <Num value={page.indexListPaddingTop ?? page.indexListPadding ?? 1.5} onChange={(v) => onUpdate({ indexListPaddingTop: v })} min={0} max={20} step={0.5} />
-        </div>
-        <div className="flex flex-col gap-1">
-          <span className="text-xs text-zinc-500 dark:text-zinc-400">Padding right (mm)</span>
-          <Num value={page.indexListPaddingRight ?? page.indexListPadding ?? 1.5} onChange={(v) => onUpdate({ indexListPaddingRight: v })} min={0} max={20} step={0.5} />
-        </div>
-        <div className="flex flex-col gap-1">
-          <span className="text-xs text-zinc-500 dark:text-zinc-400">Padding bottom (mm)</span>
-          <Num value={page.indexListPaddingBottom ?? page.indexListPadding ?? 1.5} onChange={(v) => onUpdate({ indexListPaddingBottom: v })} min={0} max={20} step={0.5} />
-        </div>
-        <div className="flex flex-col gap-1">
-          <span className="text-xs text-zinc-500 dark:text-zinc-400">Padding left (mm)</span>
-          <Num value={page.indexListPaddingLeft ?? page.indexListPadding ?? 1.5} onChange={(v) => onUpdate({ indexListPaddingLeft: v })} min={0} max={20} step={0.5} />
-        </div>
-      </div>
-      <div className="grid grid-cols-2 gap-2">
-        <div className="flex flex-col gap-1">
-          <span className="text-xs text-zinc-500 dark:text-zinc-400">Default line height (mm)</span>
-          <Num value={page.indexListLineHeight ?? 3.6} onChange={(v) => onUpdate({ indexListLineHeight: v })} min={1.2} max={12} step={0.2} />
-        </div>
-      </div>
-      <div className="grid grid-cols-2 gap-2">
-        <div className="flex items-center gap-2">
-          <Switch checked={page.indexListShowTitle !== false} onCheckedChange={(c) => onUpdate({ indexListShowTitle: c })} />
-          <span className="text-xs text-zinc-600 dark:text-zinc-300">Show title bar</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Switch checked={page.indexListRoundedCorners === true} onCheckedChange={(c) => onUpdate({ indexListRoundedCorners: c })} />
-          <span className="text-xs text-zinc-600 dark:text-zinc-300">Rounded corners</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Switch checked={page.indexListShowGridRefs !== false} onCheckedChange={(c) => onUpdate({ indexListShowGridRefs: c })} />
-          <span className="text-xs text-zinc-600 dark:text-zinc-300">Grid references</span>
-        </div>
       </div>
     </div>
   );
