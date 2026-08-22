@@ -14,7 +14,8 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { CardContent } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CSS_PX_PER_MM } from '@/lib/units';
 import { LAYOUT_FONTS } from '@/lib/titleFonts';
 import { ensureGoogleFonts } from '@/lib/placeNameFonts';
@@ -536,7 +537,7 @@ export function LayoutCanvas({
         {/* Inspector */}
         {showInspector && (
           <aside className="
-            flex min-h-0 w-80 shrink-0 flex-col border-l border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950
+            flex min-h-0 w-72 shrink-0 flex-col border-l border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950
             fixed md:relative bottom-0 left-0 right-0 md:bottom-auto md:left-auto md:right-auto
             h-[50vh] md:h-auto max-h-[50vh] md:max-h-none
             border-t md:border-t-0 border-l-0 md:border-l z-30 md:z-auto
@@ -550,64 +551,66 @@ export function LayoutCanvas({
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
-            <ScrollArea className="min-h-0 flex-1">
-              <div className="space-y-3 p-3">
-                {showPageSettings && (
-                  <Section title="Page">
-                    <PageSettings page={activePage} onUpdate={(u) => onPageLayoutUpdate(pageId, u)} />
-                  </Section>
-                )}
+            <CardContent className="flex-1 min-h-0 overflow-y-auto p-3 flex flex-col gap-2.5">
+              {showPageSettings && (
+                <>
+                  <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-200">Page</p>
+                  <PageSettings page={activePage} onUpdate={(u) => onPageLayoutUpdate(pageId, u)} />
+                </>
+              )}
 
-                {selectedIndex ? (
-                  <Section title="Index List">
-                    <IndexListProperties
-                      page={activePage}
-                      config={selectedIndex}
-                      onUpdate={(updates) => onPageIndexUpdate(pageId, selectedIndex.id, updates)}
-                    />
-                    <Button variant="destructive" size="sm" className="h-8 w-full text-xs"
-                      onClick={() => {
-                        onPageIndexRemove(pageId, selectedIndex.id);
-                        if (activeViewportId === indexItemId(selectedIndex.id)) onViewportSelect(null);
-                      }}
-                    >
-                      <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete Index List
-                    </Button>
-                  </Section>
-                ) : selectedTitleBlock ? (
-                  <Section title="Title Block">
-                    <TitleBlockProperties
-                      page={activePage}
-                      config={selectedTitleBlock}
-                      onUpdate={(updates) => onPageTitleBlockUpdate(pageId, selectedTitleBlock.id, updates)}
-                    />
-                    <Button variant="destructive" size="sm" className="h-8 w-full text-xs"
-                      onClick={() => {
-                        onPageTitleBlockRemove(pageId, selectedTitleBlock.id);
-                        if (activeViewportId === tbItemId(selectedTitleBlock.id)) onViewportSelect(null);
-                      }}
-                    >
-                      <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete Title Block
-                    </Button>
-                  </Section>
-                ) : selectedVp ? (
-                  <Section title={selectedVp.title}>
-                    <ViewportProperties
-                      viewport={selectedVp}
-                      page={pages.find((p) => p.viewports.some((v) => v.id === selectedVp.id)) ?? activePage}
-                      onUpdate={(id, updates) => {
-                        const owner = pages.find((p) => p.viewports.some((v) => v.id === id));
-                        if (owner) onPageViewportUpdate(owner.id, id, updates);
-                      }}
-                    />
-                  </Section>
-                ) : (
-                  <div className="rounded-xl border border-dashed border-zinc-300 p-4 text-center text-xs text-zinc-400 dark:border-zinc-700 dark:text-zinc-500">
-                    Select a map frame, index list, or title block to edit its properties.
-                  </div>
-                )}
-              </div>
-            </ScrollArea>
+              {selectedIndex ? (
+                <>
+                  <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-200">Index List</p>
+                  <IndexListProperties
+                    page={activePage}
+                    config={selectedIndex}
+                    onUpdate={(updates) => onPageIndexUpdate(pageId, selectedIndex.id, updates)}
+                  />
+                  <Button variant="destructive" size="sm" className="h-8 w-full text-xs"
+                    onClick={() => {
+                      onPageIndexRemove(pageId, selectedIndex.id);
+                      if (activeViewportId === indexItemId(selectedIndex.id)) onViewportSelect(null);
+                    }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete Index List
+                  </Button>
+                </>
+              ) : selectedTitleBlock ? (
+                <>
+                  <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-200">Title Block</p>
+                  <TitleBlockProperties
+                    page={activePage}
+                    config={selectedTitleBlock}
+                    onUpdate={(updates) => onPageTitleBlockUpdate(pageId, selectedTitleBlock.id, updates)}
+                  />
+                  <Button variant="destructive" size="sm" className="h-8 w-full text-xs"
+                    onClick={() => {
+                      onPageTitleBlockRemove(pageId, selectedTitleBlock.id);
+                      if (activeViewportId === tbItemId(selectedTitleBlock.id)) onViewportSelect(null);
+                    }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete Title Block
+                  </Button>
+                </>
+              ) : selectedVp ? (
+                <>
+                  <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-200">{selectedVp.title}</p>
+                  <ViewportProperties
+                    viewport={selectedVp}
+                    page={pages.find((p) => p.viewports.some((v) => v.id === selectedVp.id)) ?? activePage}
+                    onUpdate={(id, updates) => {
+                      const owner = pages.find((p) => p.viewports.some((v) => v.id === id));
+                      if (owner) onPageViewportUpdate(owner.id, id, updates);
+                    }}
+                  />
+                </>
+              ) : (
+                <div className="rounded-xl border border-dashed border-zinc-300 p-4 text-center text-xs text-zinc-400 dark:border-zinc-700 dark:text-zinc-500">
+                  Select a map frame, index list, or title block to edit its properties.
+                </div>
+              )}
+            </CardContent>
           </aside>
         )}
       </div>
@@ -1215,31 +1218,14 @@ function PageStrip({ pages, activePageId, onSetActivePageId, onAddPage, onRemove
 
 /* ------------------------------ Inspector UI ------------------------------ */
 
-function Section({ title, children, defaultOpen = false }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) {
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <div className="rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between px-3 py-2 text-xs font-semibold text-zinc-700 dark:text-zinc-200"
-      >
-        <span>{title}</span>
-        <ChevronDown className={cn('h-3.5 w-3.5 text-zinc-400 transition-transform', open && 'rotate-180')} />
-      </button>
-      {open && <div className="space-y-3 px-3 pb-3">{children}</div>}
-    </div>
-  );
-}
-
 function SubSection({ title, children, defaultOpen = false, badge }: { title: string; children: React.ReactNode; defaultOpen?: boolean; badge?: string }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="rounded-lg border border-zinc-200 dark:border-zinc-800">
+    <>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
+        className="flex w-full items-center justify-between text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
       >
         <span className="flex items-center gap-1.5">
           <span>{title}</span>
@@ -1247,17 +1233,8 @@ function SubSection({ title, children, defaultOpen = false, badge }: { title: st
         </span>
         <ChevronDown className={cn('h-3 w-3 text-zinc-400 transition-transform', open && 'rotate-180')} />
       </button>
-      {open && <div className="space-y-2 px-2.5 pb-2.5 pt-0.5">{children}</div>}
-    </div>
-  );
-}
-
-function Field({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
-  return (
-    <div className={cn('flex flex-col gap-1', className)}>
-      <Label className="text-[11px] text-zinc-500 dark:text-zinc-400">{label}</Label>
-      {children}
-    </div>
+      {open && <div className="flex flex-col gap-2 pt-1">{children}</div>}
+    </>
   );
 }
 
@@ -1270,43 +1247,56 @@ function Num({ value, onChange, min, max, step = 1 }: { value: number; onChange:
       min={min}
       max={max}
       step={step}
-      className="h-8 text-sm"
+      className="h-7 text-xs"
     />
   );
 }
 
 function FontSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="h-8 w-full rounded-lg border border-input bg-background px-2 text-sm"
-    >
-      {LAYOUT_FONTS.map((f) => (
-        <option key={f.id} value={f.id}>{f.label}</option>
-      ))}
-    </select>
+    <Select value={value} onValueChange={(v: string | null) => onChange(v ?? '')}>
+      <SelectTrigger className="text-xs h-7 px-2">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {LAYOUT_FONTS.map((f) => (
+          <SelectItem key={f.id} value={f.id}>
+            {f.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
 
 function WeightSelect({ value, onChange }: { value: 'normal' | 'medium' | 'bold'; onChange: (v: 'normal' | 'medium' | 'bold') => void }) {
   return (
-    <select value={value} onChange={(e) => onChange(e.target.value as 'normal' | 'medium' | 'bold')} className="h-8 w-full rounded-lg border border-input bg-background px-2 text-sm">
-      <option value="normal">Normal</option>
-      <option value="medium">Medium</option>
-      <option value="bold">Bold</option>
-    </select>
+    <Select value={value} onValueChange={(v: string | null) => onChange((v ?? 'normal') as 'normal' | 'medium' | 'bold')}>
+      <SelectTrigger className="text-xs h-7 px-2">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="normal">Normal</SelectItem>
+        <SelectItem value="medium">Medium</SelectItem>
+        <SelectItem value="bold">Bold</SelectItem>
+      </SelectContent>
+    </Select>
   );
 }
 
 function RotationSelect({ value, onChange }: { value: number | undefined; onChange: (v: 0 | 90 | 180 | 270) => void }) {
   return (
-    <select value={value ?? 0} onChange={(e) => onChange(Number(e.target.value) as 0 | 90 | 180 | 270)} className="h-8 w-full rounded-lg border border-input bg-background px-2 text-sm">
-      <option value={0}>0°</option>
-      <option value={90}>90°</option>
-      <option value={180}>180°</option>
-      <option value={270}>270°</option>
-    </select>
+    <Select value={String(value ?? 0)} onValueChange={(v: string | null) => onChange((Number(v ?? 0) as 0 | 90 | 180 | 270))}>
+      <SelectTrigger className="text-xs h-7 px-2">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="0">0°</SelectItem>
+        <SelectItem value="90">90°</SelectItem>
+        <SelectItem value="180">180°</SelectItem>
+        <SelectItem value="270">270°</SelectItem>
+      </SelectContent>
+    </Select>
   );
 }
 
@@ -1323,42 +1313,49 @@ function FontGroup({ family, size, weight, onFamily, onSize, onWeight, onReset, 
   sizeStep?: number;
 }) {
   return (
-    <>
-      <Field label="Font family">
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-1">
+        <span className="text-xs text-zinc-500 dark:text-zinc-400">Font family</span>
         <FontSelect value={family} onChange={onFamily} />
-      </Field>
+      </div>
       <div className="grid grid-cols-2 gap-2">
-        <Field label="Size (mm)">
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Size (mm)</span>
           <Num value={size} onChange={onSize} min={sizeMin} max={sizeMax} step={sizeStep} />
-        </Field>
-        <Field label="Weight">
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Weight</span>
           <WeightSelect value={weight} onChange={onWeight} />
-        </Field>
+        </div>
       </div>
       {onReset && (
         <Button variant="ghost" size="sm" className="h-7 w-full text-xs" onClick={onReset}>
           Reset to page default
         </Button>
       )}
-    </>
+    </div>
   );
 }
 
 function PositionFields({ pos, onChange }: { pos: Rect; onChange: (partial: Partial<Rect>) => void }) {
   return (
     <div className="grid grid-cols-2 gap-2">
-      <Field label="X (mm)">
+      <div className="flex flex-col gap-1">
+        <span className="text-xs text-zinc-500 dark:text-zinc-400">X (mm)</span>
         <Num value={pos.x} onChange={(v) => onChange({ x: v })} />
-      </Field>
-      <Field label="Y (mm)">
+      </div>
+      <div className="flex flex-col gap-1">
+        <span className="text-xs text-zinc-500 dark:text-zinc-400">Y (mm)</span>
         <Num value={pos.y} onChange={(v) => onChange({ y: v })} />
-      </Field>
-      <Field label="Width (mm)">
+      </div>
+      <div className="flex flex-col gap-1">
+        <span className="text-xs text-zinc-500 dark:text-zinc-400">Width (mm)</span>
         <Num value={pos.width} onChange={(v) => onChange({ width: Math.max(5, v) })} min={5} step={5} />
-      </Field>
-      <Field label="Height (mm)">
+      </div>
+      <div className="flex flex-col gap-1">
+        <span className="text-xs text-zinc-500 dark:text-zinc-400">Height (mm)</span>
         <Num value={pos.height} onChange={(v) => onChange({ height: Math.max(5, v) })} min={5} step={5} />
-      </Field>
+      </div>
     </div>
   );
 }
@@ -1368,26 +1365,31 @@ function PageSettings({ page, onUpdate }: { page: PrintLayout; onUpdate: (u: Par
     onUpdate({ pageMargins: { top: page.pageMargins?.top ?? 10, right: page.pageMargins?.right ?? 10, bottom: page.pageMargins?.bottom ?? 10, left: page.pageMargins?.left ?? 10, [key]: value } });
 
   return (
-    <>
-      <Field label="Paper color">
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-1">
+        <span className="text-xs text-zinc-500 dark:text-zinc-400">Paper color</span>
         <ColorPicker color={page.paperColor ?? '#ffffff'} onChange={(c) => onUpdate({ paperColor: c })} />
-      </Field>
-      <Field label="Spot color">
+      </div>
+      <div className="flex flex-col gap-1">
+        <span className="text-xs text-zinc-500 dark:text-zinc-400">Spot color</span>
         <ColorPicker color={page.spotColor} onChange={(c) => onUpdate({ spotColor: c })} />
-      </Field>
-      <Field label="Margins (mm)">
+      </div>
+      <div className="flex flex-col gap-1">
+        <span className="text-xs text-zinc-500 dark:text-zinc-400">Margins (mm)</span>
         <div className="grid grid-cols-4 gap-1.5">
           {(['top', 'right', 'bottom', 'left'] as const).map((m) => (
             <Num key={m} value={page.pageMargins?.[m] ?? 10} onChange={(v) => setMargin(m, v)} min={0} max={60} />
           ))}
         </div>
-      </Field>
-      <Field label="Item spacing (mm)">
+      </div>
+      <div className="flex flex-col gap-1">
+        <span className="text-xs text-zinc-500 dark:text-zinc-400">Item spacing (mm)</span>
         <Num value={page.itemSpacing ?? 5} onChange={(v) => onUpdate({ itemSpacing: v })} min={0} max={20} />
-      </Field>
-      <Field label="Snap to fold grid">
+      </div>
+      <div className="flex items-center gap-2">
         <Switch checked={page.snapToFold !== false} onCheckedChange={(c) => onUpdate({ snapToFold: c })} />
-      </Field>
+        <span className="text-xs text-zinc-600 dark:text-zinc-300">Snap to fold grid</span>
+      </div>
       <Separator />
       <FontGroup
         family={page.titleFontFamily ?? 'Helvetica'}
@@ -1398,84 +1400,99 @@ function PageSettings({ page, onUpdate }: { page: PrintLayout; onUpdate: (u: Par
         onWeight={(v) => onUpdate({ titleFontWeight: v })}
         onReset={() => onUpdate({ titleFontFamily: undefined, titleFontSize: undefined, titleFontWeight: undefined })}
       />
-      <Field label="Default title background">
+      <div className="flex flex-col gap-1">
+        <span className="text-xs text-zinc-500 dark:text-zinc-400">Default title background</span>
         <ColorPicker color={page.defaultTitleBackgroundColor ?? page.spotColor} onChange={(c) => onUpdate({ defaultTitleBackgroundColor: c })} />
-      </Field>
-      <Field label="Default title text color">
+      </div>
+      <div className="flex flex-col gap-1">
+        <span className="text-xs text-zinc-500 dark:text-zinc-400">Default title text color</span>
         <ColorPicker color={page.defaultTitleTextColor ?? '#ffffff'} onChange={(c) => onUpdate({ defaultTitleTextColor: c })} />
-      </Field>
+      </div>
       <Separator />
-      <p className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-200">Map settings</p>
-      <Field label="Glyphs server URL">
+      <span className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-200">Map settings</span>
+      <div className="flex flex-col gap-1">
+        <span className="text-xs text-zinc-500 dark:text-zinc-400">Glyphs server URL</span>
         <Input
           value={page.glyphsUrl ?? ''}
           placeholder="Default (OpenFreeMap)"
           onChange={(e) => onUpdate({ glyphsUrl: e.target.value || undefined })}
-          className="h-8 text-sm"
+          className="h-7 text-xs"
         />
-      </Field>
+      </div>
       <p className="text-[10px] text-zinc-400 leading-tight">
         For more fonts, use: tiles.openstreetmap.us/fonts/{'{fontstack}'}/{'{range}'}.pbf
       </p>
       <Separator />
-      <p className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-200">Index list defaults</p>
-      <Field label="Default columns">
+      <span className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-200">Index list defaults</span>
+      <div className="flex flex-col gap-1">
+        <span className="text-xs text-zinc-500 dark:text-zinc-400">Default columns</span>
         <Num value={page.indexColumns ?? 2} onChange={(v) => onUpdate({ indexColumns: Math.max(1, Math.round(v) || 1) })} min={1} max={6} />
-      </Field>
+      </div>
       <div className="grid grid-cols-2 gap-2">
-        <Field label="Default border width (mm)">
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Default border width (mm)</span>
           <Num value={page.indexListBorderWidth ?? 1} onChange={(v) => onUpdate({ indexListBorderWidth: v })} min={0} step={0.5} />
-        </Field>
-        <Field label="Default corner radius (mm)">
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Default corner radius (mm)</span>
           <Num value={page.indexListCornerRadius ?? 4} onChange={(v) => onUpdate({ indexListCornerRadius: v })} min={0} />
-        </Field>
-        <Field label="Default border color">
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Default border color</span>
           <ColorPicker color={page.indexListBorderColor ?? '#000000'} onChange={(c) => onUpdate({ indexListBorderColor: c })} />
-        </Field>
-        <Field label="Default background">
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Default background</span>
           <ColorPicker color={page.indexListBackgroundColor ?? '#ffffff'} onChange={(c) => onUpdate({ indexListBackgroundColor: c })} />
-        </Field>
-        <Field label="Default title background">
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Default title background</span>
           <ColorPicker color={page.indexListTitleBackgroundColor ?? page.defaultTitleBackgroundColor ?? page.spotColor} onChange={(c) => onUpdate({ indexListTitleBackgroundColor: c })} />
-        </Field>
-        <Field label="Default title text color">
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Default title text color</span>
           <ColorPicker color={page.indexListTitleTextColor ?? '#ffffff'} onChange={(c) => onUpdate({ indexListTitleTextColor: c })} />
-        </Field>
+        </div>
       </div>
       <div className="grid grid-cols-2 gap-2">
-        <Field label="Padding top (mm)">
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Padding top (mm)</span>
           <Num value={page.indexListPaddingTop ?? page.indexListPadding ?? 1.5} onChange={(v) => onUpdate({ indexListPaddingTop: v })} min={0} max={20} step={0.5} />
-        </Field>
-        <Field label="Padding right (mm)">
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Padding right (mm)</span>
           <Num value={page.indexListPaddingRight ?? page.indexListPadding ?? 1.5} onChange={(v) => onUpdate({ indexListPaddingRight: v })} min={0} max={20} step={0.5} />
-        </Field>
-        <Field label="Padding bottom (mm)">
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Padding bottom (mm)</span>
           <Num value={page.indexListPaddingBottom ?? page.indexListPadding ?? 1.5} onChange={(v) => onUpdate({ indexListPaddingBottom: v })} min={0} max={20} step={0.5} />
-        </Field>
-        <Field label="Padding left (mm)">
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Padding left (mm)</span>
           <Num value={page.indexListPaddingLeft ?? page.indexListPadding ?? 1.5} onChange={(v) => onUpdate({ indexListPaddingLeft: v })} min={0} max={20} step={0.5} />
-        </Field>
+        </div>
       </div>
       <div className="grid grid-cols-2 gap-2">
-        <Field label="Default line height (mm)">
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Default line height (mm)</span>
           <Num value={page.indexListLineHeight ?? 3.6} onChange={(v) => onUpdate({ indexListLineHeight: v })} min={1.2} max={12} step={0.2} />
-        </Field>
+        </div>
       </div>
       <div className="grid grid-cols-2 gap-2">
-        <Label className="flex items-center gap-2 cursor-pointer text-xs">
+        <div className="flex items-center gap-2">
           <Switch checked={page.indexListShowTitle !== false} onCheckedChange={(c) => onUpdate({ indexListShowTitle: c })} />
-          Show title bar
-        </Label>
-        <Label className="flex items-center gap-2 cursor-pointer text-xs">
+          <span className="text-xs text-zinc-600 dark:text-zinc-300">Show title bar</span>
+        </div>
+        <div className="flex items-center gap-2">
           <Switch checked={page.indexListRoundedCorners === true} onCheckedChange={(c) => onUpdate({ indexListRoundedCorners: c })} />
-          Rounded corners
-        </Label>
-        <Label className="flex items-center gap-2 cursor-pointer text-xs">
+          <span className="text-xs text-zinc-600 dark:text-zinc-300">Rounded corners</span>
+        </div>
+        <div className="flex items-center gap-2">
           <Switch checked={page.indexListShowGridRefs !== false} onCheckedChange={(c) => onUpdate({ indexListShowGridRefs: c })} />
-          Grid references
-        </Label>
+          <span className="text-xs text-zinc-600 dark:text-zinc-300">Grid references</span>
+        </div>
       </div>
-    </>
+    </div>
   );
 }
 
@@ -1488,261 +1505,289 @@ function ViewportProperties({ viewport, page, onUpdate }: {
   const updatePos = (partial: Partial<Rect>) => onUpdate(viewport.id, { positionOnPage: { ...pos, ...partial } });
 
   return (
-    <>
-      <Field label="Title">
-        <Input value={viewport.title} onChange={(e) => onUpdate(viewport.id, { title: e.target.value })} className="h-8 text-sm" />
-      </Field>
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-1">
+        <span className="text-xs text-zinc-500 dark:text-zinc-400">Title</span>
+        <Input value={viewport.title} onChange={(e) => onUpdate(viewport.id, { title: e.target.value })} className="h-7 text-xs" />
+      </div>
 
-      <SubSection title="Position">
-        <PositionFields pos={pos} onChange={updatePos} />
-        <Field label="Rotation">
-          <RotationSelect value={viewport.rotation} onChange={(v) => onUpdate(viewport.id, { rotation: v })} />
-        </Field>
-      </SubSection>
+      <Separator />
+      <span className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-200">Position</span>
+      <PositionFields pos={pos} onChange={updatePos} />
+      <div className="flex flex-col gap-1">
+        <span className="text-xs text-zinc-500 dark:text-zinc-400">Rotation</span>
+        <RotationSelect value={viewport.rotation} onChange={(v) => onUpdate(viewport.id, { rotation: v })} />
+      </div>
 
-      <SubSection title="Frame">
-        <div className="grid grid-cols-2 gap-2">
-          <Field label="Corner radius (mm)">
-            <Num value={viewport.cornerRadius ?? 4} onChange={(v) => onUpdate(viewport.id, { cornerRadius: v })} min={0} />
-          </Field>
-          <Field label="Border width (mm)">
-            <Num value={viewport.borderWidth ?? 0.1} onChange={(v) => onUpdate(viewport.id, { borderWidth: v })} min={0} step={0.1} />
-          </Field>
-          <Field label="Border color">
-            <ColorPicker color={viewport.borderColor || '#000000'} onChange={(c) => onUpdate(viewport.id, { borderColor: c })} />
-          </Field>
-          <Field label="Background">
-            <ColorPicker color={viewport.backgroundColor || '#ffffff'} onChange={(c) => onUpdate(viewport.id, { backgroundColor: c })} />
-          </Field>
+      <Separator />
+      <span className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-200">Frame</span>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Corner radius (mm)</span>
+          <Num value={viewport.cornerRadius ?? 4} onChange={(v) => onUpdate(viewport.id, { cornerRadius: v })} min={0} />
         </div>
-        <Label className="flex items-center gap-2 cursor-pointer text-xs">
-          <Switch checked={viewport.roundedCorners === true} onCheckedChange={(c) => onUpdate(viewport.id, { roundedCorners: c })} />
-          Rounded corners
-        </Label>
-      </SubSection>
-
-      <SubSection title="Title bar">
-        <div className="grid grid-cols-2 gap-2">
-          <Field label="Background color">
-            <ColorPicker color={viewport.titleBackgroundColor || '#ffffff'} onChange={(c) => onUpdate(viewport.id, { titleBackgroundColor: c })} />
-          </Field>
-          <Field label="Text color">
-            <ColorPicker
-              color={viewport.titleTextColor || page.defaultTitleTextColor || (viewport.titleBackground !== false ? '#ffffff' : '#1a1a1a')}
-              onChange={(c) => onUpdate(viewport.id, { titleTextColor: c })}
-            />
-          </Field>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Border width (mm)</span>
+          <Num value={viewport.borderWidth ?? 0.1} onChange={(v) => onUpdate(viewport.id, { borderWidth: v })} min={0} step={0.1} />
         </div>
-        <div className="grid grid-cols-2 gap-2">
-          <Label className="flex items-center gap-2 cursor-pointer text-xs">
-            <Switch checked={viewport.showTitle !== false} onCheckedChange={(c) => onUpdate(viewport.id, { showTitle: c })} />
-            Show title
-          </Label>
-          <Label className="flex items-center gap-2 cursor-pointer text-xs">
-            <Switch checked={viewport.titleBackground !== false} onCheckedChange={(c) => onUpdate(viewport.id, { titleBackground: c })} />
-            Background
-          </Label>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Border color</span>
+          <ColorPicker color={viewport.borderColor || '#000000'} onChange={(c) => onUpdate(viewport.id, { borderColor: c })} />
         </div>
-        <Field label="Title bar height (mm)">
-          <Num value={viewport.titleBarHeight ?? 7} onChange={(v) => onUpdate(viewport.id, { titleBarHeight: v })} min={1} max={20} step={0.5} />
-        </Field>
-        <FontGroup
-          family={viewport.titleFontFamily ?? page.titleFontFamily ?? 'Helvetica'}
-          size={viewport.titleFontSize ?? page.titleFontSize ?? 3}
-          weight={viewport.titleFontWeight ?? page.titleFontWeight ?? 'bold'}
-          onFamily={(v) => onUpdate(viewport.id, { titleFontFamily: v })}
-          onSize={(v) => onUpdate(viewport.id, { titleFontSize: v })}
-          onWeight={(v) => onUpdate(viewport.id, { titleFontWeight: v })}
-          onReset={() => onUpdate(viewport.id, { titleFontFamily: undefined, titleFontSize: undefined, titleFontWeight: undefined })}
-        />
-      </SubSection>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Background</span>
+          <ColorPicker color={viewport.backgroundColor || '#ffffff'} onChange={(c) => onUpdate(viewport.id, { backgroundColor: c })} />
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <Switch checked={viewport.roundedCorners === true} onCheckedChange={(c) => onUpdate(viewport.id, { roundedCorners: c })} />
+        <span className="text-xs text-zinc-600 dark:text-zinc-300">Rounded corners</span>
+      </div>
 
-      <SubSection title="Grid & border">
-        <Label className="flex items-center gap-2 cursor-pointer text-xs">
-          <Switch checked={viewport.showGrid} onCheckedChange={(c) => onUpdate(viewport.id, { showGrid: c })} />
-          Show grid
-        </Label>
-        <Label className="flex items-center gap-2 cursor-pointer text-xs">
-          <Switch checked={viewport.showGridIndicator !== false} onCheckedChange={(c) => onUpdate(viewport.id, { showGridIndicator: c })} />
-          Grid size indicator
-        </Label>
-        <Label className="flex items-center gap-2 cursor-pointer text-xs">
-          <Switch checked={viewport.showScaleBar ?? true} onCheckedChange={(c) => onUpdate(viewport.id, { showScaleBar: c })} />
-          Scale bar
-        </Label>
-        <Label className="flex items-center gap-2 cursor-pointer text-xs">
-          <Switch checked={viewport.showScaleText ?? true} onCheckedChange={(c) => onUpdate(viewport.id, { showScaleText: c })} />
-          Scale text (1:N)
-        </Label>
-        <Field label="Spacing">
-          <select
-            value={viewport.gridSpacing ? String(viewport.gridSpacing) : 'auto'}
-            onChange={(e) => onUpdate(viewport.id, { gridSpacing: e.target.value === 'auto' ? undefined : Number(e.target.value) })}
-            className="h-8 w-full rounded-lg border border-input bg-background px-2 text-sm"
-          >
-            <option value="auto">Auto</option>
+      <Separator />
+      <span className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-200">Title bar</span>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Background color</span>
+          <ColorPicker color={viewport.titleBackgroundColor || '#ffffff'} onChange={(c) => onUpdate(viewport.id, { titleBackgroundColor: c })} />
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Text color</span>
+          <ColorPicker
+            color={viewport.titleTextColor || page.defaultTitleTextColor || (viewport.titleBackground !== false ? '#ffffff' : '#1a1a1a')}
+            onChange={(c) => onUpdate(viewport.id, { titleTextColor: c })}
+          />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="flex items-center gap-2">
+          <Switch checked={viewport.showTitle !== false} onCheckedChange={(c) => onUpdate(viewport.id, { showTitle: c })} />
+          <span className="text-xs text-zinc-600 dark:text-zinc-300">Show title</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Switch checked={viewport.titleBackground !== false} onCheckedChange={(c) => onUpdate(viewport.id, { titleBackground: c })} />
+          <span className="text-xs text-zinc-600 dark:text-zinc-300">Background</span>
+        </div>
+      </div>
+      <div className="flex flex-col gap-1">
+        <span className="text-xs text-zinc-500 dark:text-zinc-400">Title bar height (mm)</span>
+        <Num value={viewport.titleBarHeight ?? 7} onChange={(v) => onUpdate(viewport.id, { titleBarHeight: v })} min={1} max={20} step={0.5} />
+      </div>
+      <FontGroup
+        family={viewport.titleFontFamily ?? page.titleFontFamily ?? 'Helvetica'}
+        size={viewport.titleFontSize ?? page.titleFontSize ?? 3}
+        weight={viewport.titleFontWeight ?? page.titleFontWeight ?? 'bold'}
+        onFamily={(v) => onUpdate(viewport.id, { titleFontFamily: v })}
+        onSize={(v) => onUpdate(viewport.id, { titleFontSize: v })}
+        onWeight={(v) => onUpdate(viewport.id, { titleFontWeight: v })}
+        onReset={() => onUpdate(viewport.id, { titleFontFamily: undefined, titleFontSize: undefined, titleFontWeight: undefined })}
+      />
+
+      <Separator />
+      <span className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-200">Grid & border</span>
+      <div className="flex items-center gap-2">
+        <Switch checked={viewport.showGrid} onCheckedChange={(c) => onUpdate(viewport.id, { showGrid: c })} />
+        <span className="text-xs text-zinc-600 dark:text-zinc-300">Show grid</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <Switch checked={viewport.showGridIndicator !== false} onCheckedChange={(c) => onUpdate(viewport.id, { showGridIndicator: c })} />
+        <span className="text-xs text-zinc-600 dark:text-zinc-300">Grid size indicator</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <Switch checked={viewport.showScaleBar ?? true} onCheckedChange={(c) => onUpdate(viewport.id, { showScaleBar: c })} />
+        <span className="text-xs text-zinc-600 dark:text-zinc-300">Scale bar</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <Switch checked={viewport.showScaleText ?? true} onCheckedChange={(c) => onUpdate(viewport.id, { showScaleText: c })} />
+        <span className="text-xs text-zinc-600 dark:text-zinc-300">Scale text (1:N)</span>
+      </div>
+      <div className="flex flex-col gap-1">
+        <span className="text-xs text-zinc-500 dark:text-zinc-400">Spacing</span>
+        <Select value={viewport.gridSpacing ? String(viewport.gridSpacing) : 'auto'} onValueChange={(v) => onUpdate(viewport.id, { gridSpacing: v === 'auto' ? undefined : Number(v) })}>
+          <SelectTrigger className="text-xs h-7 px-2">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="auto">Auto</SelectItem>
             {GRID_SPACING_OPTIONS.map((o) => (
-              <option key={o.meters} value={o.meters}>{o.label}</option>
+              <SelectItem key={o.meters} value={o.meters}>{o.label}</SelectItem>
             ))}
-          </select>
-        </Field>
-        <div className="grid grid-cols-2 gap-2">
-          <Field label="Line width (mm)">
-            <Num value={viewport.gridLineWidth ?? 0.15} onChange={(v) => onUpdate(viewport.id, { gridLineWidth: v })} min={0.05} step={0.05} />
-          </Field>
-          <Field label="Opacity">
-            <Num value={viewport.gridOpacity ?? 0.5} onChange={(v) => onUpdate(viewport.id, { gridOpacity: v })} min={0} max={1} step={0.1} />
-          </Field>
-          <Field label="Grid color">
-            <ColorPicker color={viewport.gridColor || '#8a8a8a'} onChange={(c) => onUpdate(viewport.id, { gridColor: c })} />
-          </Field>
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Line width (mm)</span>
+          <Num value={viewport.gridLineWidth ?? 0.15} onChange={(v) => onUpdate(viewport.id, { gridLineWidth: v })} min={0.05} step={0.05} />
         </div>
-        <Label className="flex items-center gap-2 cursor-pointer text-xs">
-          <Switch checked={viewport.showBorder !== false} onCheckedChange={(c) => onUpdate(viewport.id, { showBorder: c })} />
-          Border frame
-        </Label>
-        <Label className="flex items-center gap-2 cursor-pointer text-xs">
-          <Switch checked={viewport.showBorderTicks !== false} onCheckedChange={(c) => onUpdate(viewport.id, { showBorderTicks: c })} />
-          Border ticks
-        </Label>
-        <Label className="flex items-center gap-2 cursor-pointer text-xs">
-          <Switch checked={viewport.showGridRefs === true} onCheckedChange={(c) => onUpdate(viewport.id, { showGridRefs: c })} />
-          Grid references (A1)
-        </Label>
-        {viewport.showGridRefs === true && (
-          <div className="grid grid-cols-2 gap-2">
-            <Field label="Ref font" className="col-span-2">
-              <FontSelect value={viewport.gridRefFontFamily ?? 'Helvetica'} onChange={(v) => onUpdate(viewport.id, { gridRefFontFamily: v })} />
-            </Field>
-            <Field label="Size (mm)">
-              <Num value={viewport.gridRefFontSize ?? 2.8} onChange={(v) => onUpdate(viewport.id, { gridRefFontSize: v })} min={0.5} max={12} step={0.2} />
-            </Field>
-            <Field label="Weight">
-              <WeightSelect value={viewport.gridRefFontWeight ?? 'normal'} onChange={(v) => onUpdate(viewport.id, { gridRefFontWeight: v })} />
-            </Field>
-            <Field label="Color" className="col-span-2">
-              <ColorPicker color={viewport.gridRefFontColor || '#3c3c3c'} onChange={(c) => onUpdate(viewport.id, { gridRefFontColor: c })} />
-            </Field>
-          </div>
-        )}
-        <div className="grid grid-cols-2 gap-2">
-          <Label className="flex items-center gap-2 cursor-pointer text-xs">
-            <Switch checked={viewport.borderAlternating === true} onCheckedChange={(c) => onUpdate(viewport.id, { borderAlternating: c })} />
-            Alternating frame
-          </Label>
-          <Field label="Frame thickness (mm)">
-            <Num value={viewport.gridBorderWidth ?? 0.5} onChange={(v) => onUpdate(viewport.id, { gridBorderWidth: v })} min={0.1} step={0.1} />
-          </Field>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Opacity</span>
+          <Num value={viewport.gridOpacity ?? 0.5} onChange={(v) => onUpdate(viewport.id, { gridOpacity: v })} min={0} max={1} step={0.1} />
         </div>
-        {viewport.borderAlternating && (
-          <div className="grid grid-cols-2 gap-2">
-            <Field label="Frame color 1">
-              <ColorPicker color={viewport.borderColor || '#000000'} onChange={(c) => onUpdate(viewport.id, { borderColor: c })} />
-            </Field>
-            <Field label="Frame color 2">
-              <ColorPicker color={viewport.borderAlternateColor || '#ffffff'} onChange={(c) => onUpdate(viewport.id, { borderAlternateColor: c })} />
-            </Field>
-            <Field label="Corner color">
-              <ColorPicker
-                color={viewport.borderAlternatingCornerColor || viewport.borderColor || '#000000'}
-                onChange={(c) => onUpdate(viewport.id, { borderAlternatingCornerColor: c })}
-              />
-            </Field>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Grid color</span>
+          <ColorPicker color={viewport.gridColor || '#8a8a8a'} onChange={(c) => onUpdate(viewport.id, { gridColor: c })} />
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <Switch checked={viewport.showBorder !== false} onCheckedChange={(c) => onUpdate(viewport.id, { showBorder: c })} />
+        <span className="text-xs text-zinc-600 dark:text-zinc-300">Border frame</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <Switch checked={viewport.showBorderTicks !== false} onCheckedChange={(c) => onUpdate(viewport.id, { showBorderTicks: c })} />
+        <span className="text-xs text-zinc-600 dark:text-zinc-300">Border ticks</span>
+      </div>
+
+      <SubSection title="Grid references" defaultOpen={viewport.showGridRefs === true}>
+        <div className="grid grid-cols-2 gap-2">
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-zinc-500 dark:text-zinc-400">Ref font</span>
+            <FontSelect value={viewport.gridRefFontFamily ?? 'Helvetica'} onChange={(v) => onUpdate(viewport.id, { gridRefFontFamily: v })} />
           </div>
-        )}
-        <Label className="flex items-center gap-2 cursor-pointer text-xs">
-          <Switch checked={viewport.borderAlternatingOutline !== false} onCheckedChange={(c) => onUpdate(viewport.id, { borderAlternatingOutline: c })} />
-          Outline (inner + outer)
-        </Label>
-        {viewport.borderAlternating && viewport.borderAlternatingOutline !== false && (
-          <Field label="Outline width (mm)">
-            <Num value={viewport.borderAlternatingOutlineWidth ?? 0.2} onChange={(v) => onUpdate(viewport.id, { borderAlternatingOutlineWidth: v })} min={0.1} step={0.1} />
-          </Field>
-        )}
-        <Button variant="outline" size="sm" className="h-7 w-full text-xs" onClick={() => onUpdate(viewport.id, { bbox: undefined, showGrid: false })}>
-          Clear grid bounds
-        </Button>
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-zinc-500 dark:text-zinc-400">Size (mm)</span>
+            <Num value={viewport.gridRefFontSize ?? 2.8} onChange={(v) => onUpdate(viewport.id, { gridRefFontSize: v })} min={0.5} max={12} step={0.2} />
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-zinc-500 dark:text-zinc-400">Weight</span>
+            <WeightSelect value={viewport.gridRefFontWeight ?? 'normal'} onChange={(v) => onUpdate(viewport.id, { gridRefFontWeight: v })} />
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-zinc-500 dark:text-zinc-400">Color</span>
+            <ColorPicker color={viewport.gridRefFontColor || '#3c3c3c'} onChange={(c) => onUpdate(viewport.id, { gridRefFontColor: c })} />
+          </div>
+        </div>
       </SubSection>
 
-      <SubSection title="Insets">
-        <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-          Choose which maps to outline inside this one. Only maps with a set grid area can be outlined.
-        </p>
-        {(() => {
-          const otherMaps = page.viewports.filter((v) => v.id !== viewport.id && v.bbox);
-          const insetSelected: Set<string> = viewport.insetViewportIds
-            ? new Set(viewport.insetViewportIds)
-            : viewport.showInsets === true
-              ? new Set(otherMaps.map((v) => v.id))
-              : new Set();
-          const toggleInset = (id: string) => {
-            const next = new Set(insetSelected);
-            if (next.has(id)) next.delete(id);
-            else next.add(id);
-            const list = Array.from(next);
-            onUpdate(viewport.id, { insetViewportIds: list, showInsets: list.length > 0 });
-          };
-          return (
-            <>
-              <div className="flex flex-wrap gap-1">
-                {otherMaps.length === 0 && (
-                  <span className="text-[11px] text-zinc-400">No other maps with a set grid area.</span>
-                )}
-                {otherMaps.map((v) => {
-                  const on = insetSelected.has(v.id);
-                  return (
-                    <button
-                      key={v.id}
-                      type="button"
-                      onClick={() => toggleInset(v.id)}
-                      className={cn(
-                        'rounded-full border px-2 py-0.5 text-[11px]',
-                        on ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-zinc-300 text-zinc-500'
-                      )}
-                      title={v.title}
-                    >
-                      {v.title}
-                    </button>
-                  );
-                })}
-              </div>
-              {insetSelected.size > 0 && (
-                <>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Field label="Line color">
-                      <ColorPicker color={viewport.insetColor || '#e0563d'} onChange={(c) => onUpdate(viewport.id, { insetColor: c })} />
-                    </Field>
-                    <Field label="Line width (mm)">
-                      <Num value={viewport.insetLineWidth ?? 0.3} onChange={(v) => onUpdate(viewport.id, { insetLineWidth: v })} min={0.1} step={0.1} />
-                    </Field>
-                  </div>
-                  <Label className="flex items-center gap-2 cursor-pointer text-xs">
-                    <Switch checked={viewport.showInsetLabels !== false} onCheckedChange={(c) => onUpdate(viewport.id, { showInsetLabels: c })} />
-                    Show labels
-                  </Label>
-                </>
-              )}
-            </>
-          );
-        })()}
+      <div className="grid grid-cols-2 gap-2">
+        <div className="flex items-center gap-2">
+          <Switch checked={viewport.borderAlternating === true} onCheckedChange={(c) => onUpdate(viewport.id, { borderAlternating: c })} />
+          <span className="text-xs text-zinc-600 dark:text-zinc-300">Alternating frame</span>
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Frame thickness (mm)</span>
+          <Num value={viewport.gridBorderWidth ?? 0.5} onChange={(v) => onUpdate(viewport.id, { gridBorderWidth: v })} min={0.1} step={0.1} />
+        </div>
+      </div>
+
+      <SubSection title="Alternating frame colors" defaultOpen={viewport.borderAlternating === true}>
+        <div className="grid grid-cols-2 gap-2">
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-zinc-500 dark:text-zinc-400">Frame color 1</span>
+            <ColorPicker color={viewport.borderColor || '#000000'} onChange={(c) => onUpdate(viewport.id, { borderColor: c })} />
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-zinc-500 dark:text-zinc-400">Frame color 2</span>
+            <ColorPicker color={viewport.borderAlternateColor || '#ffffff'} onChange={(c) => onUpdate(viewport.id, { borderAlternateColor: c })} />
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-zinc-500 dark:text-zinc-400">Corner color</span>
+            <ColorPicker
+              color={viewport.borderAlternatingCornerColor || viewport.borderColor || '#000000'}
+              onChange={(c) => onUpdate(viewport.id, { borderAlternatingCornerColor: c })}
+            />
+          </div>
+        </div>
       </SubSection>
+
+      <div className="flex items-center gap-2">
+        <Switch checked={viewport.borderAlternatingOutline !== false} onCheckedChange={(c) => onUpdate(viewport.id, { borderAlternatingOutline: c })} />
+        <span className="text-xs text-zinc-600 dark:text-zinc-300">Outline (inner + outer)</span>
+      </div>
+      {viewport.borderAlternating && viewport.borderAlternatingOutline !== false && (
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Outline width (mm)</span>
+          <Num value={viewport.borderAlternatingOutlineWidth ?? 0.2} onChange={(v) => onUpdate(viewport.id, { borderAlternatingOutlineWidth: v })} min={0.1} step={0.1} />
+        </div>
+      )}
+      <Button variant="outline" size="sm" className="h-7 w-full text-xs" onClick={() => onUpdate(viewport.id, { bbox: undefined, showGrid: false })}>
+        Clear grid bounds
+      </Button>
+
+      <Separator />
+      <span className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-200">Insets</span>
+      <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+        Choose which maps to outline inside this one. Only maps with a set grid area can be outlined.
+      </p>
+      {(() => {
+        const otherMaps = page.viewports.filter((v) => v.id !== viewport.id && v.bbox);
+        const insetSelected: Set<string> = viewport.insetViewportIds
+          ? new Set(viewport.insetViewportIds)
+          : viewport.showInsets === true
+            ? new Set(otherMaps.map((v) => v.id))
+            : new Set();
+        const toggleInset = (id: string) => {
+          const next = new Set(insetSelected);
+          if (next.has(id)) next.delete(id);
+          else next.add(id);
+          const list = Array.from(next);
+          onUpdate(viewport.id, { insetViewportIds: list, showInsets: list.length > 0 });
+        };
+        return (
+          <>
+            <div className="flex flex-wrap gap-1">
+              {otherMaps.length === 0 && (
+                <span className="text-[11px] text-zinc-400">No other maps with a set grid area.</span>
+              )}
+              {otherMaps.map((v) => {
+                const on = insetSelected.has(v.id);
+                return (
+                  <button
+                    key={v.id}
+                    type="button"
+                    onClick={() => toggleInset(v.id)}
+                    className={cn(
+                      'rounded-full border px-2 py-0.5 text-[11px]',
+                      on ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-zinc-300 text-zinc-500'
+                    )}
+                    title={v.title}
+                  >
+                    {v.title}
+                  </button>
+                );
+              })}
+            </div>
+            {insetSelected.size > 0 && (
+              <>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs text-zinc-500 dark:text-zinc-400">Line color</span>
+                    <ColorPicker color={viewport.insetColor || '#e0563d'} onChange={(c) => onUpdate(viewport.id, { insetColor: c })} />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs text-zinc-500 dark:text-zinc-400">Line width (mm)</span>
+                    <Num value={viewport.insetLineWidth ?? 0.3} onChange={(v) => onUpdate(viewport.id, { insetLineWidth: v })} min={0.1} step={0.1} />
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch checked={viewport.showInsetLabels !== false} onCheckedChange={(c) => onUpdate(viewport.id, { showInsetLabels: c })} />
+                  <span className="text-xs text-zinc-600 dark:text-zinc-300">Show labels</span>
+                </div>
+              </>
+            )}
+          </>
+        );
+      })()}
 
       <PoiVisibilityEditor key={viewport.id} viewport={viewport} onUpdate={onUpdate} />
 
-      <SubSection title="Map view">
-        <div className="grid grid-cols-2 gap-2">
-          <Field label="Longitude">
-            <Num value={viewport.center[0]} onChange={(v) => onUpdate(viewport.id, { center: [v, viewport.center[1]] })} step={0.0001} />
-          </Field>
-          <Field label="Latitude">
-            <Num value={viewport.center[1]} onChange={(v) => onUpdate(viewport.id, { center: [viewport.center[0], v] })} step={0.0001} />
-          </Field>
+      <Separator />
+      <span className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-200">Map view</span>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Longitude</span>
+          <Num value={viewport.center[0]} onChange={(v) => onUpdate(viewport.id, { center: [v, viewport.center[1]] })} step={0.0001} />
         </div>
-        <Field label="Map zoom">
-          <Num value={viewport.zoom} onChange={(v) => onUpdate(viewport.id, { zoom: v })} min={1} max={20} step={0.5} />
-        </Field>
-      </SubSection>
-    </>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Latitude</span>
+          <Num value={viewport.center[1]} onChange={(v) => onUpdate(viewport.id, { center: [viewport.center[0], v] })} step={0.0001} />
+        </div>
+      </div>
+      <div className="flex flex-col gap-1">
+        <span className="text-xs text-zinc-500 dark:text-zinc-400">Map zoom</span>
+        <Num value={viewport.zoom} onChange={(v) => onUpdate(viewport.id, { zoom: v })} min={1} max={20} step={0.5} />
+      </div>
+    </div>
   );
 }
 
@@ -1778,14 +1823,15 @@ function PoiVisibilityEditor({ viewport, onUpdate }: {
       <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
         Which POIs get markers on this map. Defaults to every active POI.
       </p>
-      <Label className="flex items-center gap-2 cursor-pointer text-xs">
+      <div className="flex items-center gap-2">
         <Switch
           checked={viewport.spiderify !== false}
           onCheckedChange={(c) => onUpdate(viewport.id, { spiderify: c })}
         />
-        Spiderify overlapping markers
-      </Label>
-      <Field label={`Marker size (${(viewport.poiMarkerScale ?? 1).toFixed(1)}x)`}>
+        <span className="text-xs text-zinc-600 dark:text-zinc-300">Spiderify overlapping markers</span>
+      </div>
+      <div className="flex flex-col gap-1">
+        <span className="text-xs text-zinc-500 dark:text-zinc-400">Marker size ({(viewport.poiMarkerScale ?? 1).toFixed(1)}x)</span>
         <input
           type="range"
           min={0.5}
@@ -1795,7 +1841,7 @@ function PoiVisibilityEditor({ viewport, onUpdate }: {
           onChange={(e) => onUpdate(viewport.id, { poiMarkerScale: parseFloat(e.target.value) })}
           className="w-full h-1.5 accent-current"
         />
-      </Field>
+      </div>
       <div className="flex gap-1">
         <Button variant="outline" size="sm" className="h-7 flex-1 text-xs" onClick={() => setVisible(undefined)}>
           All
@@ -1845,7 +1891,6 @@ function IndexListProperties({ page, config, onUpdate }: {
   };
 
   const allCount = scopePois(pois, { ...resolved, scope: 'all' }, page.viewports).length;
-  const scopedCount = scopePois(pois, resolved, page.viewports).length;
   const vpCounts = page.viewports.map((vp) => {
     const b = viewportBounds(vp);
     return pois.filter((p) => p.active && p.lng >= b[0] && p.lng <= b[2] && p.lat >= b[1] && p.lat <= b[3]).length;
@@ -1864,222 +1909,263 @@ function IndexListProperties({ page, config, onUpdate }: {
   };
 
   return (
-    <>
-      <Field label="Title">
-        <Input value={resolved.title} onChange={(e) => onUpdate({ title: e.target.value })} className="h-8 text-sm" />
-      </Field>
-
-      <SubSection title="Position">
-        <PositionFields pos={config.position} onChange={updatePos} />
-        <Field label="Rotation">
-          <RotationSelect value={config.rotation} onChange={(v) => onUpdate({ rotation: v })} />
-        </Field>
-      </SubSection>
-
-      <SubSection title="What it lists" badge={`${scopedCount} places`}>
-        <Field label="Scope">
-        <div className="flex flex-wrap gap-1">
-          <button
-            type="button"
-            onClick={() => onUpdate({ scope: 'all' })}
-            className={cn('rounded-full border px-2 py-0.5 text-[11px]', scope === 'all' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-zinc-300 text-zinc-500')}
-          >
-            All · {allCount}
-          </button>
-          {page.viewports.map((vp) => {
-            const on = scope !== 'all' && scope.includes(vp.id);
-            return (
-              <button
-                key={vp.id}
-                type="button"
-                onClick={() => toggleVp(vp.id)}
-                className={cn('rounded-full border px-2 py-0.5 text-[11px]', on ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-zinc-300 text-zinc-500')}
-                title={vp.title}
-              >
-                {vp.title} · {vpCounts[page.viewports.indexOf(vp)]}
-              </button>
-            );
-          })}
-        </div>
-      </Field>
-
-      <div className="grid grid-cols-2 gap-2">
-        <Field label="Sort by">
-          <select value={config.sortBy ?? 'number'} onChange={(e) => onUpdate({ sortBy: e.target.value as IndexListConfig['sortBy'] })} className="h-8 w-full rounded-lg border border-input bg-background px-2 text-sm">
-            <option value="number">Number</option>
-            <option value="name">Name</option>
-            <option value="category">Category</option>
-            <option value="cityRegion">City / Region</option>
-          </select>
-        </Field>
-        <Field label="Direction">
-          <select value={config.sortDirection ?? 'asc'} onChange={(e) => onUpdate({ sortDirection: e.target.value as IndexListConfig['sortDirection'] })} className="h-8 w-full rounded-lg border border-input bg-background px-2 text-sm">
-            <option value="asc">Ascending</option>
-            <option value="desc">Descending</option>
-          </select>
-        </Field>
-        <Field label="Columns">
-          <Num value={resolved.columns} onChange={(v) => onUpdate({ columns: Math.max(1, Math.round(v) || 1) })} min={1} max={6} />
-        </Field>
-        <Field label="Group by">
-          <select value={resolved.groupBy} onChange={(e) => onUpdate({ groupBy: e.target.value as IndexListConfig['groupBy'] })} className="h-8 w-full rounded-lg border border-input bg-background px-2 text-sm">
-            <option value="none">None</option>
-            <option value="category">Category</option>
-            <option value="map">Map</option>
-          </select>
-        </Field>
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-1">
+        <span className="text-xs text-zinc-500 dark:text-zinc-400">Title</span>
+        <Input value={resolved.title} onChange={(e) => onUpdate({ title: e.target.value })} className="h-7 text-xs" />
       </div>
 
-      {resolved.groupBy === 'category' && (
-        <Field label="Category order (drag-free reorder)">
-          <div className="flex flex-col gap-1">
-            {display.map((cat) => (
-              <div key={cat} className="flex items-center gap-1 rounded-md border border-zinc-200 px-2 py-1">
-                <span className="flex-1 truncate text-xs">{cat}</span>
-                <button type="button" className="rounded px-1 text-zinc-500 hover:bg-zinc-100" onClick={() => moveCat(cat, -1)} disabled={cat === display[0]}>
-                  ▲
-                </button>
-                <button type="button" className="rounded px-1 text-zinc-500 hover:bg-zinc-100" onClick={() => moveCat(cat, 1)} disabled={cat === display[display.length - 1]}>
-                  ▼
-                </button>
-              </div>
+      <Separator />
+      <span className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-200">Position</span>
+      <PositionFields pos={config.position} onChange={updatePos} />
+      <div className="flex flex-col gap-1">
+        <span className="text-xs text-zinc-500 dark:text-zinc-400">Rotation</span>
+        <RotationSelect value={config.rotation} onChange={(v) => onUpdate({ rotation: v })} />
+      </div>
+
+      <Separator />
+      <span className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-200">What it lists</span>
+      <div className="flex flex-wrap gap-1">
+        <button
+          type="button"
+          onClick={() => onUpdate({ scope: 'all' })}
+          className={cn('rounded-full border px-2 py-0.5 text-[11px]', scope === 'all' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-zinc-300 text-zinc-500')}
+        >
+          All · {allCount}
+        </button>
+        {page.viewports.map((vp) => {
+          const on = scope !== 'all' && scope.includes(vp.id);
+          return (
+            <button
+              key={vp.id}
+              type="button"
+              onClick={() => toggleVp(vp.id)}
+              className={cn('rounded-full border px-2 py-0.5 text-[11px]', on ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-zinc-300 text-zinc-500')}
+              title={vp.title}
+            >
+              {vp.title} · {vpCounts[page.viewports.indexOf(vp)]}
+            </button>
+          );
+        })}
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Sort by</span>
+          <Select value={config.sortBy ?? 'number'} onValueChange={(v) => onUpdate({ sortBy: v as IndexListConfig['sortBy'] })}>
+            <SelectTrigger className="text-xs h-7 px-2">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="number">Number</SelectItem>
+              <SelectItem value="name">Name</SelectItem>
+              <SelectItem value="category">Category</SelectItem>
+              <SelectItem value="cityRegion">City / Region</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Direction</span>
+          <Select value={config.sortDirection ?? 'asc'} onValueChange={(v) => onUpdate({ sortDirection: v as IndexListConfig['sortDirection'] })}>
+            <SelectTrigger className="text-xs h-7 px-2">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="asc">Ascending</SelectItem>
+              <SelectItem value="desc">Descending</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Columns</span>
+          <Num value={resolved.columns} onChange={(v) => onUpdate({ columns: Math.max(1, Math.round(v) || 1) })} min={1} max={6} />
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Group by</span>
+          <Select value={resolved.groupBy} onValueChange={(v) => onUpdate({ groupBy: v as IndexListConfig['groupBy'] })}>
+            <SelectTrigger className="text-xs h-7 px-2">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">None</SelectItem>
+              <SelectItem value="category">Category</SelectItem>
+              <SelectItem value="map">Map</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <SubSection title="Category order" defaultOpen={resolved.groupBy === 'category'}>
+        <div className="flex flex-col gap-1">
+          {display.map((cat) => (
+            <div key={cat} className="flex items-center gap-1 rounded-md border border-zinc-200 px-2 py-1">
+              <span className="flex-1 truncate text-xs">{cat}</span>
+              <button type="button" className="rounded px-1 text-zinc-500 hover:bg-zinc-100" onClick={() => moveCat(cat, -1)} disabled={cat === display[0]}>
+                ▲
+              </button>
+              <button type="button" className="rounded px-1 text-zinc-500 hover:bg-zinc-100" onClick={() => moveCat(cat, 1)} disabled={cat === display[display.length - 1]}>
+                ▼
+              </button>
+            </div>
+          ))}
+        </div>
+      </SubSection>
+
+      <Separator />
+      <span className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-200">Layout</span>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Text align</span>
+          <Select value={resolved.textAlign} onValueChange={(v) => onUpdate({ textAlign: v as IndexListConfig['textAlign'] })}>
+            <SelectTrigger className="text-xs h-7 px-2">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="left">Left</SelectItem>
+              <SelectItem value="center">Center</SelectItem>
+              <SelectItem value="right">Right</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Column gap (mm)</span>
+          <Num value={resolved.columnGap} onChange={(v) => onUpdate({ columnGap: v })} min={0} max={20} step={0.5} />
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Max height (mm)</span>
+          <Num value={resolved.maxHeight} onChange={(v) => onUpdate({ maxHeight: v })} min={0} max={500} step={1} />
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Overflow</span>
+          <Select value={resolved.overflow} onValueChange={(v) => onUpdate({ overflow: v as IndexListConfig['overflow'] })}>
+            <SelectTrigger className="text-xs h-7 px-2">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="clip">Clip</SelectItem>
+              <SelectItem value="ellipsis">Ellipsis</SelectItem>
+              <SelectItem value="page">Page</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      {resolved.columns > 1 && (
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Column widths ({resolved.columns} cols)</span>
+          <div className="flex gap-1">
+            {Array.from({ length: resolved.columns }, (_, i) => (
+              <Num
+                key={i}
+                value={resolved.columnWidths[i] ?? 1}
+                onChange={(v) => {
+                  const widths = [...resolved.columnWidths];
+                  while (widths.length <= i) widths.push(1);
+                  widths[i] = v;
+                  onUpdate({ columnWidths: widths });
+                }}
+                min={0.1}
+                max={10}
+                step={0.5}
+              />
             ))}
           </div>
-        </Field>
+        </div>
       )}
 
-      </SubSection>
-
-      <SubSection title="Layout">
-        <div className="grid grid-cols-2 gap-2">
-          <Field label="Text align">
-            <select value={resolved.textAlign} onChange={(e) => onUpdate({ textAlign: e.target.value as IndexListConfig['textAlign'] })} className="h-8 w-full rounded-lg border border-input bg-background px-2 text-sm">
-              <option value="left">Left</option>
-              <option value="center">Center</option>
-              <option value="right">Right</option>
-            </select>
-          </Field>
-          <Field label="Column gap (mm)">
-            <Num value={resolved.columnGap} onChange={(v) => onUpdate({ columnGap: v })} min={0} max={20} step={0.5} />
-          </Field>
-          <Field label="Max height (mm)">
-            <Num value={resolved.maxHeight} onChange={(v) => onUpdate({ maxHeight: v })} min={0} max={500} step={1} />
-          </Field>
-          <Field label="Overflow">
-            <select value={resolved.overflow} onChange={(e) => onUpdate({ overflow: e.target.value as IndexListConfig['overflow'] })} className="h-8 w-full rounded-lg border border-input bg-background px-2 text-sm">
-              <option value="clip">Clip</option>
-              <option value="ellipsis">Ellipsis</option>
-              <option value="page">Page</option>
-            </select>
-          </Field>
-        </div>
-        {resolved.columns > 1 && (
-          <Field label={`Column widths (${resolved.columns} cols)`}>
-            <div className="flex gap-1">
-              {Array.from({ length: resolved.columns }, (_, i) => (
-                <Num
-                  key={i}
-                  value={resolved.columnWidths[i] ?? 1}
-                  onChange={(v) => {
-                    const widths = [...resolved.columnWidths];
-                    while (widths.length <= i) widths.push(1);
-                    widths[i] = v;
-                    onUpdate({ columnWidths: widths });
-                  }}
-                  min={0.1}
-                  max={10}
-                  step={0.5}
-                />
-              ))}
-            </div>
-          </Field>
-        )}
-      </SubSection>
-
-      <SubSection title="Style">
-        <div className="grid grid-cols-2 gap-2">
-          <Field label="Corner radius (mm)">
+      <Separator />
+      <span className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-200">Style</span>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Corner radius (mm)</span>
           <Num value={resolved.cornerRadius} onChange={(v) => onUpdate({ cornerRadius: v })} min={0} />
-        </Field>
-        <Field label="Border width (mm)">
-          <Num value={resolved.borderWidth} onChange={(v) => onUpdate({ borderWidth: v })} min={0} step={0.5} />
-        </Field>
-        <Field label="Border color">
-          <ColorPicker color={resolved.borderColor} onChange={(c) => onUpdate({ borderColor: c })} />
-        </Field>
-        <Field label="Background">
-          <ColorPicker color={resolved.backgroundColor} onChange={(c) => onUpdate({ backgroundColor: c })} />
-        </Field>
-        <Field label="Title background">
-          <ColorPicker color={resolved.titleBackgroundColor} onChange={(c) => onUpdate({ titleBackgroundColor: c })} />
-        </Field>
-        <Field label="Title text">
-          <ColorPicker color={resolved.titleTextColor} onChange={(c) => onUpdate({ titleTextColor: c })} />
-        </Field>
-        <Field label="Icon size (mm)">
-          <Num value={resolved.iconSize} onChange={(v) => onUpdate({ iconSize: v })} min={1} max={10} step={0.5} />
-        </Field>
-      </div>
-      <div className="grid grid-cols-2 gap-2">
-        <Label className="flex items-center gap-2 cursor-pointer text-xs col-span-2">
-          <Switch checked={resolved.showTitleBorder} onCheckedChange={(c) => onUpdate({ showTitleBorder: c })} />
-          Title bar border
-        </Label>
-        {resolved.showTitleBorder && (
-          <>
-            <Field label="Title border width (mm)">
-              <Num value={resolved.titleBorderWidth} onChange={(v) => onUpdate({ titleBorderWidth: v })} min={0} step={0.1} />
-            </Field>
-            <Field label="Title border color">
-              <ColorPicker color={resolved.titleBorderColor} onChange={(c) => onUpdate({ titleBorderColor: c })} />
-            </Field>
-          </>
-        )}
-      </div>
-      <div className="grid grid-cols-2 gap-2">
-        <Label className="flex items-center gap-2 cursor-pointer text-xs">
-          <Switch checked={resolved.showTitle} onCheckedChange={(c) => onUpdate({ showTitle: c })} />
-          Show title bar
-        </Label>
-        <Label className="flex items-center gap-2 cursor-pointer text-xs">
-          <Switch checked={resolved.showIcons} onCheckedChange={(c) => onUpdate({ showIcons: c })} />
-          Category symbols
-        </Label>
-        <Label className="flex items-center gap-2 cursor-pointer text-xs">
-          <Switch checked={resolved.roundedCorners} onCheckedChange={(c) => onUpdate({ roundedCorners: c })} />
-          Rounded corners
-        </Label>
-        <Label className="flex items-center gap-2 cursor-pointer text-xs">
-          <Switch checked={resolved.showGridRefs} onCheckedChange={(c) => onUpdate({ showGridRefs: c })} />
-          Grid references
-        </Label>
-      </div>
-      </SubSection>
-
-      <SubSection title="Title bar">
-        <div className="grid grid-cols-2 gap-2">
-          <Field label="Text color">
-            <ColorPicker color={resolved.titleTextColor} onChange={(c) => onUpdate({ titleTextColor: c })} />
-          </Field>
-          <Field label="Padding (mm)">
-            <Num value={resolved.titlePadding} onChange={(v) => onUpdate({ titlePadding: v })} min={0} max={10} step={0.5} />
-          </Field>
         </div>
-        <FontGroup
-          family={resolved.titleFontFamily}
-          size={resolved.titleFontSize}
-          weight={resolved.titleFontWeight}
-          onFamily={(v) => onUpdate({ titleFontFamily: v })}
-          onSize={(v) => onUpdate({ titleFontSize: v })}
-          onWeight={(v) => onUpdate({ titleFontWeight: v })}
-          onReset={() => onUpdate({ titleFontFamily: undefined, titleFontSize: undefined, titleFontWeight: undefined })}
-        />
-      </SubSection>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Border width (mm)</span>
+          <Num value={resolved.borderWidth} onChange={(v) => onUpdate({ borderWidth: v })} min={0} step={0.5} />
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Border color</span>
+          <ColorPicker color={resolved.borderColor} onChange={(c) => onUpdate({ borderColor: c })} />
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Background</span>
+          <ColorPicker color={resolved.backgroundColor} onChange={(c) => onUpdate({ backgroundColor: c })} />
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Title background</span>
+          <ColorPicker color={resolved.titleBackgroundColor} onChange={(c) => onUpdate({ titleBackgroundColor: c })} />
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Title text</span>
+          <ColorPicker color={resolved.titleTextColor} onChange={(c) => onUpdate({ titleTextColor: c })} />
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Icon size (mm)</span>
+          <Num value={resolved.iconSize} onChange={(v) => onUpdate({ iconSize: v })} min={1} max={10} step={0.5} />
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <Switch checked={resolved.showTitleBorder} onCheckedChange={(c) => onUpdate({ showTitleBorder: c })} />
+        <span className="text-xs text-zinc-600 dark:text-zinc-300">Title bar border</span>
+      </div>
+      {resolved.showTitleBorder && (
+        <div className="grid grid-cols-2 gap-2">
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-zinc-500 dark:text-zinc-400">Title border width (mm)</span>
+            <Num value={resolved.titleBorderWidth} onChange={(v) => onUpdate({ titleBorderWidth: v })} min={0} step={0.1} />
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-zinc-500 dark:text-zinc-400">Title border color</span>
+            <ColorPicker color={resolved.titleBorderColor} onChange={(c) => onUpdate({ titleBorderColor: c })} />
+          </div>
+        </div>
+      )}
+      <div className="grid grid-cols-2 gap-2">
+        <div className="flex items-center gap-2">
+          <Switch checked={resolved.showTitle} onCheckedChange={(c) => onUpdate({ showTitle: c })} />
+          <span className="text-xs text-zinc-600 dark:text-zinc-300">Show title bar</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Switch checked={resolved.showIcons} onCheckedChange={(c) => onUpdate({ showIcons: c })} />
+          <span className="text-xs text-zinc-600 dark:text-zinc-300">Category symbols</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Switch checked={resolved.roundedCorners} onCheckedChange={(c) => onUpdate({ roundedCorners: c })} />
+          <span className="text-xs text-zinc-600 dark:text-zinc-300">Rounded corners</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Switch checked={resolved.showGridRefs} onCheckedChange={(c) => onUpdate({ showGridRefs: c })} />
+          <span className="text-xs text-zinc-600 dark:text-zinc-300">Grid references</span>
+        </div>
+      </div>
 
-      <SubSection title="Body text">
-        <Field label="Text color">
-          <ColorPicker color={resolved.bodyTextColor} onChange={(c) => onUpdate({ bodyTextColor: c })} />
-        </Field>
+      <Separator />
+      <span className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-200">Title bar</span>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Text color</span>
+          <ColorPicker color={resolved.titleTextColor} onChange={(c) => onUpdate({ titleTextColor: c })} />
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Padding (mm)</span>
+          <Num value={resolved.titlePadding} onChange={(v) => onUpdate({ titlePadding: v })} min={0} max={10} step={0.5} />
+        </div>
+      </div>
+      <FontGroup
+        family={resolved.titleFontFamily}
+        size={resolved.titleFontSize}
+        weight={resolved.titleFontWeight}
+        onFamily={(v) => onUpdate({ titleFontFamily: v })}
+        onSize={(v) => onUpdate({ titleFontSize: v })}
+        onWeight={(v) => onUpdate({ titleFontWeight: v })}
+        onReset={() => onUpdate({ titleFontFamily: undefined, titleFontSize: undefined, titleFontWeight: undefined })}
+      />
+
+      <Separator />
+      <span className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-200">Body text</span>
+      <div className="flex flex-col gap-1">
+        <span className="text-xs text-zinc-500 dark:text-zinc-400">Text color</span>
+        <ColorPicker color={resolved.bodyTextColor} onChange={(c) => onUpdate({ bodyTextColor: c })} />
+      </div>
       <FontGroup
         family={resolved.bodyFontFamily}
         size={resolved.bodyFontSize}
@@ -2093,72 +2179,90 @@ function IndexListProperties({ page, config, onUpdate }: {
         sizeStep={0.2}
       />
       <div className="grid grid-cols-2 gap-2">
-        <Field label="Top (mm)">
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Top (mm)</span>
           <Num value={resolved.paddingTop} onChange={(v) => onUpdate({ paddingTop: v })} min={0} max={20} step={0.5} />
-        </Field>
-        <Field label="Right (mm)">
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Right (mm)</span>
           <Num value={resolved.paddingRight} onChange={(v) => onUpdate({ paddingRight: v })} min={0} max={20} step={0.5} />
-        </Field>
-        <Field label="Bottom (mm)">
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Bottom (mm)</span>
           <Num value={resolved.paddingBottom} onChange={(v) => onUpdate({ paddingBottom: v })} min={0} max={20} step={0.5} />
-        </Field>
-        <Field label="Left (mm)">
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Left (mm)</span>
           <Num value={resolved.paddingLeft} onChange={(v) => onUpdate({ paddingLeft: v })} min={0} max={20} step={0.5} />
-        </Field>
+        </div>
       </div>
-      <Field label="Line height (mm)">
+      <div className="flex flex-col gap-1">
+        <span className="text-xs text-zinc-500 dark:text-zinc-400">Line height (mm)</span>
         <Num value={resolved.lineHeight} onChange={(v) => onUpdate({ lineHeight: v })} min={1.2} max={12} step={0.2} />
-      </Field>
-      </SubSection>
+      </div>
 
-      <SubSection title="Number format">
-        <div className="grid grid-cols-2 gap-2">
-          <Field label="Format">
-            <select value={resolved.numberFormat} onChange={(e) => onUpdate({ numberFormat: e.target.value as IndexListConfig['numberFormat'] })} className="h-8 w-full rounded-lg border border-input bg-background px-2 text-sm">
-              <option value="number">1</option>
-              <option value="paren">(1)</option>
-              <option value="dot">1.</option>
-              <option value="dash">- 1</option>
-            </select>
-          </Field>
-        </div>
-        <FontGroup
-          family={resolved.numberFontFamily}
-          size={resolved.numberFontSize}
-          weight={resolved.numberFontWeight}
-          onFamily={(v) => onUpdate({ numberFontFamily: v })}
-          onSize={(v) => onUpdate({ numberFontSize: v })}
-          onWeight={(v) => onUpdate({ numberFontWeight: v })}
-          onReset={() => onUpdate({ numberFontFamily: undefined, numberFontSize: undefined, numberFontWeight: undefined })}
-          sizeMin={1}
-          sizeMax={8}
-          sizeStep={0.2}
-        />
-      </SubSection>
+      <Separator />
+      <span className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-200">Number format</span>
+      <div className="flex flex-col gap-1">
+        <span className="text-xs text-zinc-500 dark:text-zinc-400">Format</span>
+        <Select value={resolved.numberFormat} onValueChange={(v) => onUpdate({ numberFormat: v as IndexListConfig['numberFormat'] })}>
+          <SelectTrigger className="text-xs h-7 px-2">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="number">1</SelectItem>
+            <SelectItem value="paren">(1)</SelectItem>
+            <SelectItem value="dot">1.</SelectItem>
+            <SelectItem value="dash">- 1</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <FontGroup
+        family={resolved.numberFontFamily}
+        size={resolved.numberFontSize}
+        weight={resolved.numberFontWeight}
+        onFamily={(v) => onUpdate({ numberFontFamily: v })}
+        onSize={(v) => onUpdate({ numberFontSize: v })}
+        onWeight={(v) => onUpdate({ numberFontWeight: v })}
+        onReset={() => onUpdate({ numberFontFamily: undefined, numberFontSize: undefined, numberFontWeight: undefined })}
+        sizeMin={1}
+        sizeMax={8}
+        sizeStep={0.2}
+      />
 
-      <SubSection title="Category headers">
-        <div className="grid grid-cols-2 gap-2">
-          <Field label="Header color">
-            <ColorPicker color={resolved.categoryColor} onChange={(c) => onUpdate({ categoryColor: c })} />
-          </Field>
-          <Field label="Separator style">
-            <select value={resolved.categorySeparatorStyle} onChange={(e) => onUpdate({ categorySeparatorStyle: e.target.value as IndexListConfig['categorySeparatorStyle'] })} className="h-8 w-full rounded-lg border border-input bg-background px-2 text-sm">
-              <option value="none">None</option>
-              <option value="underline">Underline</option>
-              <option value="line">Full line</option>
-            </select>
-          </Field>
-          {resolved.categorySeparatorStyle !== 'none' && (
-            <>
-              <Field label="Separator color">
-                <ColorPicker color={resolved.categorySeparatorColor} onChange={(c) => onUpdate({ categorySeparatorColor: c })} />
-              </Field>
-              <Field label="Separator width (mm)">
-                <Num value={resolved.categorySeparatorWidth} onChange={(v) => onUpdate({ categorySeparatorWidth: v })} min={0.1} max={2} step={0.1} />
-              </Field>
-            </>
-          )}
+      <Separator />
+      <span className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-200">Category headers</span>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Header color</span>
+          <ColorPicker color={resolved.categoryColor} onChange={(c) => onUpdate({ categoryColor: c })} />
         </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Separator style</span>
+          <Select value={resolved.categorySeparatorStyle} onValueChange={(v) => onUpdate({ categorySeparatorStyle: v as IndexListConfig['categorySeparatorStyle'] })}>
+            <SelectTrigger className="text-xs h-7 px-2">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">None</SelectItem>
+              <SelectItem value="underline">Underline</SelectItem>
+              <SelectItem value="line">Full line</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {resolved.categorySeparatorStyle !== 'none' && (
+          <>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-zinc-500 dark:text-zinc-400">Separator color</span>
+              <ColorPicker color={resolved.categorySeparatorColor} onChange={(c) => onUpdate({ categorySeparatorColor: c })} />
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-zinc-500 dark:text-zinc-400">Separator width (mm)</span>
+              <Num value={resolved.categorySeparatorWidth} onChange={(v) => onUpdate({ categorySeparatorWidth: v })} min={0.1} max={2} step={0.1} />
+            </div>
+          </>
+        )}
+      </div>
       <FontGroup
         family={resolved.categoryFontFamily}
         size={resolved.categoryFontSize}
@@ -2171,24 +2275,23 @@ function IndexListProperties({ page, config, onUpdate }: {
         sizeMax={8}
         sizeStep={0.2}
       />
-      </SubSection>
 
-      <SubSection title="Stacking">
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => onUpdate({ stackOrder: (config.stackOrder ?? 0) + 1 })}>
-            Bring Forward
+      <Separator />
+      <span className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-200">Stacking</span>
+      <div className="flex items-center gap-2">
+        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => onUpdate({ stackOrder: (config.stackOrder ?? 0) + 1 })}>
+          Bring Forward
+        </Button>
+        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => onUpdate({ stackOrder: (config.stackOrder ?? 0) - 1 })}>
+          Send Backward
+        </Button>
+        {(config.stackOrder ?? 0) !== 0 && (
+          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => onUpdate({ stackOrder: undefined })}>
+            Reset
           </Button>
-          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => onUpdate({ stackOrder: (config.stackOrder ?? 0) - 1 })}>
-            Send Backward
-          </Button>
-          {(config.stackOrder ?? 0) !== 0 && (
-            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => onUpdate({ stackOrder: undefined })}>
-              Reset
-            </Button>
-          )}
-        </div>
-      </SubSection>
-    </>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -2201,72 +2304,85 @@ function TitleBlockProperties({ page, config, onUpdate }: {
     onUpdate({ position: { x: config.position.x, y: config.position.y, width: config.position.width, height: config.position.height, ...partial } });
 
   return (
-    <>
-      <SubSection title="Title">
-        <Field label="Title">
-          <Input value={config.title} onChange={(e) => onUpdate({ title: e.target.value })} className="h-8 text-sm" />
-        </Field>
-        <Field label="Subtitle">
-          <Input value={config.subtitle ?? ''} onChange={(e) => onUpdate({ subtitle: e.target.value })} className="h-8 text-sm" />
-        </Field>
-      </SubSection>
+    <div className="flex flex-col gap-2">
+      <Separator />
+      <span className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-200">Title</span>
+      <div className="flex flex-col gap-1">
+        <span className="text-xs text-zinc-500 dark:text-zinc-400">Title</span>
+        <Input value={config.title} onChange={(e) => onUpdate({ title: e.target.value })} className="h-7 text-xs" />
+      </div>
+      <div className="flex flex-col gap-1">
+        <span className="text-xs text-zinc-500 dark:text-zinc-400">Subtitle</span>
+        <Input value={config.subtitle ?? ''} onChange={(e) => onUpdate({ subtitle: e.target.value })} className="h-7 text-xs" />
+      </div>
 
-      <SubSection title="Position">
-        <PositionFields pos={config.position} onChange={updatePos} />
-        <div className="grid grid-cols-2 gap-2">
-          <Field label="Rotation">
-            <RotationSelect value={config.rotation} onChange={(v) => onUpdate({ rotation: v })} />
-          </Field>
-          <Field label="Alignment">
-            <select value={config.align ?? 'left'} onChange={(e) => onUpdate({ align: e.target.value as TitleBlockConfig['align'] })} className="h-8 w-full rounded-lg border border-input bg-background px-2 text-sm">
-              <option value="left">Left</option>
-              <option value="center">Center</option>
-              <option value="right">Right</option>
-            </select>
-          </Field>
+      <Separator />
+      <span className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-200">Position</span>
+      <PositionFields pos={config.position} onChange={updatePos} />
+      <div className="grid grid-cols-2 gap-2">
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Rotation</span>
+          <RotationSelect value={config.rotation} onChange={(v) => onUpdate({ rotation: v })} />
         </div>
-      </SubSection>
-
-      <SubSection title="Style">
-        <FontGroup
-          family={config.fontFamily ?? page.titleFontFamily ?? 'Helvetica'}
-          size={config.fontSize ?? page.titleFontSize ?? 5}
-          weight={config.fontWeight ?? 'bold'}
-          onFamily={(v) => onUpdate({ fontFamily: v })}
-          onSize={(v) => onUpdate({ fontSize: v })}
-          onWeight={(v) => onUpdate({ fontWeight: v })}
-        />
-        <div className="grid grid-cols-2 gap-2">
-          <Field label="Text color">
-            <ColorPicker color={config.textColor ?? '#1a1a1a'} onChange={(c) => onUpdate({ textColor: c })} />
-          </Field>
-          <Field label="Background">
-            <ColorPicker color={config.backgroundColor ?? '#ffffff'} onChange={(c) => onUpdate({ backgroundColor: c })} />
-          </Field>
-          <Field label="Border color">
-            <ColorPicker color={config.borderColor ?? page.spotColor} onChange={(c) => onUpdate({ borderColor: c })} />
-          </Field>
-          <Field label="Border width (mm)">
-            <Num value={config.borderWidth ?? 0.1} onChange={(v) => onUpdate({ borderWidth: v })} min={0} step={0.5} />
-          </Field>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Alignment</span>
+          <Select value={config.align ?? 'left'} onValueChange={(v) => onUpdate({ align: v as TitleBlockConfig['align'] })}>
+            <SelectTrigger className="text-xs h-7 px-2">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="left">Left</SelectItem>
+              <SelectItem value="center">Center</SelectItem>
+              <SelectItem value="right">Right</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-      </SubSection>
+      </div>
 
-      <SubSection title="Stacking">
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => onUpdate({ stackOrder: (config.stackOrder ?? 0) + 1 })}>
-            Bring Forward
+      <Separator />
+      <span className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-200">Style</span>
+      <FontGroup
+        family={config.fontFamily ?? page.titleFontFamily ?? 'Helvetica'}
+        size={config.fontSize ?? page.titleFontSize ?? 5}
+        weight={config.fontWeight ?? 'bold'}
+        onFamily={(v) => onUpdate({ fontFamily: v })}
+        onSize={(v) => onUpdate({ fontSize: v })}
+        onWeight={(v) => onUpdate({ fontWeight: v })}
+      />
+      <div className="grid grid-cols-2 gap-2">
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Text color</span>
+          <ColorPicker color={config.textColor ?? '#1a1a1a'} onChange={(c) => onUpdate({ textColor: c })} />
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Background</span>
+          <ColorPicker color={config.backgroundColor ?? '#ffffff'} onChange={(c) => onUpdate({ backgroundColor: c })} />
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Border color</span>
+          <ColorPicker color={config.borderColor ?? page.spotColor} onChange={(c) => onUpdate({ borderColor: c })} />
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Border width (mm)</span>
+          <Num value={config.borderWidth ?? 0.1} onChange={(v) => onUpdate({ borderWidth: v })} min={0} step={0.5} />
+        </div>
+      </div>
+
+      <Separator />
+      <span className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-200">Stacking</span>
+      <div className="flex items-center gap-2">
+        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => onUpdate({ stackOrder: (config.stackOrder ?? 0) + 1 })}>
+          Bring Forward
+        </Button>
+        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => onUpdate({ stackOrder: (config.stackOrder ?? 0) - 1 })}>
+          Send Backward
+        </Button>
+        {(config.stackOrder ?? 0) !== 0 && (
+          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => onUpdate({ stackOrder: undefined })}>
+            Reset
           </Button>
-          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => onUpdate({ stackOrder: (config.stackOrder ?? 0) - 1 })}>
-            Send Backward
-          </Button>
-          {(config.stackOrder ?? 0) !== 0 && (
-            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => onUpdate({ stackOrder: undefined })}>
-              Reset
-            </Button>
-          )}
-        </div>
-      </SubSection>
-    </>
+        )}
+      </div>
+    </div>
   );
 }
