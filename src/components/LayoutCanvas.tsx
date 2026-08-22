@@ -784,22 +784,19 @@ function PageCanvas({
     return items;
   });
 
-  const sig = JSON.stringify({
-    vps: page.viewports.map((v) => [v.id, v.positionOnPage, v.rotation]),
-    indexes: page.indexLists.map((c) => [c.id, c.position, c.rotation]),
-    tbs: page.titleBlocks.map((c) => [c.id, c.position, c.rotation]),
-  });
-  const prevSigRef = useRef<string>('');
+  const prevCountsRef = useRef({ vps: page.viewports.length, indexes: page.indexLists.length, tbs: page.titleBlocks.length });
 
   useEffect(() => {
     if (skipSyncRef.current) { skipSyncRef.current = false; return; }
-    if (prevSigRef.current === sig) return;
-    prevSigRef.current = sig;
+    const prev = prevCountsRef.current;
+    const cur = { vps: page.viewports.length, indexes: page.indexLists.length, tbs: page.titleBlocks.length };
+    if (prev.vps === cur.vps && prev.indexes === cur.indexes && prev.tbs === cur.tbs) return;
+    prevCountsRef.current = cur;
     const items: GridItem[] = page.viewports.map(viewportToItem);
     items.push(...page.indexLists.map(indexToItem));
     items.push(...page.titleBlocks.map(tbToItem));
     setGridItems(items);
-  }, [sig, page.viewports, page.indexLists, page.titleBlocks, viewportToItem, indexToItem, tbToItem]);
+  }, [page.viewports, page.indexLists, page.titleBlocks, viewportToItem, indexToItem, tbToItem]);
 
   const persistGridItem = useCallback(
     (item: { i: string; x: number; y: number; w: number; h: number }) => {
