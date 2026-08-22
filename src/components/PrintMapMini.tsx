@@ -77,72 +77,82 @@ export function PrintMapMini({ viewport, className, onLoad, onUpdate, spotColor:
 
   useEffect(() => {
     const inner = innerRef.current;
-    if (!inner || mapRef.current) return;
+    if (!inner) return;
 
     let cancelled = false;
+    let cleanup: (() => void) | null = null;
+
+    const scheduleCleanup = (fn: () => void) => {
+      cleanup = fn;
+    };
 
     (async () => {
       await ensureGoogleFonts();
       if (cancelled || !innerRef.current || mapRef.current) return;
 
-    const printWidthPx = viewport.positionOnPage.width * CSS_PX_PER_MM;
-    const tileLabelScale = Math.max(0.5, EDITOR_APPROX_WIDTH / printWidthPx);
+      const printWidthPx = viewport.positionOnPage.width * CSS_PX_PER_MM;
+      const tileLabelScale = Math.max(0.5, EDITOR_APPROX_WIDTH / printWidthPx);
 
-    const map = createViewportMap(innerRef.current, {
-      viewport,
-      labelScale: tileLabelScale,
-      interactive: false,
-    });
+      const map = createViewportMap(innerRef.current, {
+        viewport,
+        labelScale: tileLabelScale,
+        interactive: false,
+      });
 
-    mapRef.current = map;
+      mapRef.current = map;
 
-    const onStyleLoad = () => {
-      const pw = viewport.positionOnPage.width * CSS_PX_PER_MM;
-      const ls = Math.max(0.5, EDITOR_APPROX_WIDTH / pw);
-      applyViewportStyle(map, { viewport, pois, colorMode, spotColor, labelScale: ls });
-      applyEnhancedLayerStyle(map, { ...DEFAULT_LAYER_STYLE, ...viewport.layers });
-      if (onLoad) onLoad(map);
-    };
+      const onStyleLoad = () => {
+        const pw = viewport.positionOnPage.width * CSS_PX_PER_MM;
+        const ls = Math.max(0.5, EDITOR_APPROX_WIDTH / pw);
+        applyViewportStyle(map, { viewport, pois, colorMode, spotColor, labelScale: ls });
+        applyEnhancedLayerStyle(map, { ...DEFAULT_LAYER_STYLE, ...viewport.layers });
+        if (onLoad) onLoad(map);
+      };
 
-    if (map.isStyleLoaded()) {
-      onStyleLoad();
-    } else {
-      map.once('style.load', onStyleLoad);
-    }
-
-    map.on('moveend', () => {
-      const onUpdate = onUpdateRef.current;
-      if (!onUpdate) return;
-      const cur = viewportRef.current;
-      if (cur.bbox) return;
-      const center = map.getCenter();
-      const updates: Partial<MapViewport> = {};
-      if (Math.abs(center.lng - cur.center[0]) + Math.abs(center.lat - cur.center[1]) > 0.00001) {
-        updates.center = [center.lng, center.lat];
+      if (map.isStyleLoaded()) {
+        onStyleLoad();
+      } else {
+        map.once('style.load', onStyleLoad);
       }
-      const z = map.getZoom();
-      if (Math.abs(z - cur.zoom) > 0.001) {
-        updates.zoom = z;
-      }
-      if (updates.center || updates.zoom) onUpdate(updates);
-    });
 
-    const ro = new ResizeObserver(() => {
-      if (mapRef.current) {
-        mapRef.current.resize();
-        fitToBbox(mapRef.current);
-      }
-    });
-    ro.observe(inner);
+      map.on('moveend', () => {
+        const onUpdate = onUpdateRef.current;
+        if (!onUpdate) return;
+        const cur = viewportRef.current;
+        if (cur.bbox) return;
+        const center = map.getCenter();
+        const updates: Partial<MapViewport> = {};
+        if (Math.abs(center.lng - cur.center[0]) + Math.abs(center.lat - cur.center[1]) > 0.00001) {
+          updates.center = [center.lng, center.lat];
+        }
+        const z = map.getZoom();
+        if (Math.abs(z - cur.zoom) > 0.001) {
+          updates.zoom = z;
+        }
+        if (updates.center || updates.zoom) onUpdate(updates);
+      });
+
+      const ro = new ResizeObserver(() => {
+        if (mapRef.current) {
+          mapRef.current.resize();
+          fitToBbox(mapRef.current);
+        }
+      });
+      ro.observe(inner);
+
+      scheduleCleanup(() => {
+        ro.disconnect();
+        map.off('style.load', onStyleLoad);
+        map.remove();
+        mapRef.current = null;
+      });
+    })();
 
     return () => {
       cancelled = true;
-      ro.disconnect();
-      map.off('style.load', onStyleLoad);
-      map.remove();
+      if (cleanup) cleanup();
       mapRef.current = null;
     };
-    })(); // async IIFE – ensureGoogleFonts
   }, [viewport.id]);
 
   // Keep center/zoom in sync when edited externally (frame zoom buttons, props)
