@@ -95,7 +95,6 @@ export function PoiLabelOverlay({ map, pois, style, scale = 1 }: PoiLabelOverlay
               backgroundColor: style.bgColor,
               color: style.textColor,
               fontSize: fontSizePx,
-              padding: `${paddingYPx} ${paddingXPx}`,
               borderRadius: borderRadiusPx,
               boxShadow: style.showShadow ? '0 1px 3px rgba(0,0,0,0.2)' : 'none',
               fontFamily: 'system-ui, sans-serif',
@@ -103,12 +102,15 @@ export function PoiLabelOverlay({ map, pois, style, scale = 1 }: PoiLabelOverlay
               whiteSpace: 'nowrap',
               border: '2px solid red',
               boxSizing: 'border-box',
+              padding: 0,
             }}
           >
+            <div style={{ height: paddingYPx, width: paddingXPx }} />
             {p.name}
             <span style={{ fontSize: '9px', opacity: 0.6, marginLeft: 4 }}>
               pad={style.padding.toFixed(1)} font={style.fontSize.toFixed(1)} rad={style.borderRadius.toFixed(1)} | py={paddingYPx.toFixed(0)}px px={paddingXPx.toFixed(0)}px
             </span>
+            <div style={{ height: paddingYPx, width: paddingXPx }} />
           </div>
           <div
             style={{
