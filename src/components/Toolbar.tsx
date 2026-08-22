@@ -4,6 +4,7 @@ import { useMap } from '@/context/MapContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
@@ -15,7 +16,7 @@ import { useState } from 'react';
 import { LAYOUT_FONTS } from '@/lib/titleFonts';
 
 export function Toolbar() {
-  const { layout, updateLayout, pois, pages, canUndo, canRedo, undo, redo, activeViewportId, updateViewport } = useMap();
+  const { layout, updateLayout, pois, pages, canUndo, canRedo, undo, redo, activeViewportId, updateViewport, activeTab, setActiveTab } = useMap();
   const [exportOpen, setExportOpen] = useState(false);
   const [autoDownload, setAutoDownload] = useState(false);
   const [pageSettingsOpen, setPageSettingsOpen] = useState(false);
@@ -31,6 +32,13 @@ export function Toolbar() {
   return (
     <>
       <div className="flex items-center gap-4 p-3 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 flex-wrap">
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'layout' | 'map')} className="flex-shrink-0">
+          <TabsList className="bg-transparent p-0 border-0">
+            <TabsTrigger value="layout" className="text-xs md:text-sm px-3 md:px-4 data-[state=active]:bg-zinc-100 dark:data-[state=active]:bg-zinc-800">Print Layout</TabsTrigger>
+            <TabsTrigger value="map" className="text-xs md:text-sm px-3 md:px-4 data-[state=active]:bg-zinc-100 dark:data-[state=active]:bg-zinc-800">Map Editor</TabsTrigger>
+          </TabsList>
+        </Tabs>
+        <div className="w-px h-5 bg-zinc-200 dark:bg-zinc-700" />
         <div className="flex items-center gap-3">
           <label className="text-xs text-zinc-500 dark:text-zinc-400">Page</label>
           <Select value={layout.pageSize} onValueChange={handlePageSizeChange}>

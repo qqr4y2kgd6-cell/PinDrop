@@ -472,24 +472,14 @@ export function LayoutCanvas({
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setShowInspector(true)}
+            onClick={() => setShowInspector(!showInspector)}
             className=""
           >
             <Settings className="h-4 w-4 mr-1" />
-            Layout
+            {showInspector ? 'Hide' : 'Show'} Inspector
           </Button>
         </div>
       </div>
-
-      {/* Page strip */}
-      <PageStrip
-        pages={pages}
-        activePageId={activePageId}
-        onSetActivePageId={onSetActivePageId}
-        onAddPage={onAddPage}
-        onRemovePage={onRemovePage}
-        onRenamePage={onRenamePage}
-      />
 
       <div className="flex-1 flex overflow-hidden">
         {/* Pages canvas */}
@@ -610,6 +600,16 @@ export function LayoutCanvas({
             <PanelRightOpen className="h-4 w-4" />
           </Button>
         )}
+        
+        {/* Page strip */}
+        <PageStrip
+          pages={pages}
+          activePageId={activePageId}
+          onSetActivePageId={onSetActivePageId}
+          onAddPage={onAddPage}
+          onRemovePage={onRemovePage}
+          onRenamePage={onRenamePage}
+        />
       </div>
     </div>
   );
