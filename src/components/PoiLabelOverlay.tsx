@@ -26,7 +26,7 @@ export function PoiLabelOverlay({ map, pois, style, scale = 1 }: PoiLabelOverlay
   const [positions, setPositions] = useState<Array<{ id: string; name: string; x: number; y: number }>>([]);
 
   useEffect(() => {
-    console.log('[PoiLabelOverlay] style changed:', style);
+    console.log('[PoiLabelOverlay] style changed:', style, 'type padding:', typeof style.padding, typeof style.fontSize, typeof style.borderRadius);
     console.log('[PoiLabelOverlay] computed:', {
       fontSizePx: style.fontSize * MM_TO_PX * scale,
       paddingYPx: style.padding * MM_TO_PX * scale,
@@ -70,7 +70,7 @@ export function PoiLabelOverlay({ map, pois, style, scale = 1 }: PoiLabelOverlay
 
   if (!map || positions.length === 0) return null;
 
-  console.log('[PoiLabelOverlay] render style:', style, 'positions:', positions.length);
+  console.log('[PoiLabelOverlay] render style:', style, 'positions:', positions.length, 'computed:', { fontSizePx, paddingYPx, paddingXPx, borderRadiusPx, arrowSize });
 
   const fontSizePx = style.fontSize * MM_TO_PX * scale;
   const paddingYPx = style.padding * MM_TO_PX * scale;
@@ -106,7 +106,7 @@ export function PoiLabelOverlay({ map, pois, style, scale = 1 }: PoiLabelOverlay
           >
             {p.name}
             <span style={{ fontSize: '9px', opacity: 0.6, marginLeft: 4 }}>
-              pad={style.padding.toFixed(1)} font={style.fontSize.toFixed(1)} rad={style.borderRadius.toFixed(1)}
+              pad={style.padding.toFixed(1)} font={style.fontSize.toFixed(1)} rad={style.borderRadius.toFixed(1)} | py={paddingYPx.toFixed(0)}px px={paddingXPx.toFixed(0)}px
             </span>
           </div>
           <div
