@@ -95,6 +95,7 @@ export function PoiLabelOverlay({ map, pois, style, scale = 1 }: PoiLabelOverlay
               fontFamily: 'system-ui, sans-serif',
               lineHeight: '1.2',
               whiteSpace: 'nowrap',
+              border: '1px solid rgba(255,0,0,0.3)',
             }}
           >
             {p.name}
@@ -105,7 +106,7 @@ export function PoiLabelOverlay({ map, pois, style, scale = 1 }: PoiLabelOverlay
               height: 0,
               borderLeft: `${arrowSize}px solid transparent`,
               borderRight: `${arrowSize}px solid transparent`,
-              borderTop: `${arrowSize} solid ${style.bgColor}`,
+              borderTop: `${arrowSize}px solid ${style.bgColor}`,
               margin: '0 auto',
             }}
           />
