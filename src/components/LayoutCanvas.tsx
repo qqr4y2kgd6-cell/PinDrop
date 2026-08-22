@@ -8,7 +8,7 @@ import { PrintMapFrame } from './PrintMapFrame';
 import { IndexListFrameWrapper } from './IndexListFrameWrapper';
 import { TitleBlockFrame } from './TitleBlockFrame';
 import { ColorPicker } from './ColorPicker';
-import { Plus, List, Type, ZoomIn, ZoomOut, RotateCcw, Settings, FilePlus2, Trash2, Pencil, ChevronDown, ChevronRight, PanelRight, LayoutTemplate, FoldHorizontal } from 'lucide-react';
+import { Plus, List, Type, ZoomIn, ZoomOut, RotateCcw, Settings, FilePlus2, Trash2, Pencil, ChevronDown, ChevronRight, PanelRight, PanelRightOpen, LayoutTemplate, FoldHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -529,7 +529,7 @@ export function LayoutCanvas({
         </div>
 
         {/* Inspector */}
-        {showInspector && (
+        {showInspector ? (
           <aside className="
             flex min-h-0 w-72 shrink-0 flex-col border-l border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950
             fixed md:relative bottom-0 left-0 right-0 md:bottom-auto md:left-auto md:right-auto
@@ -541,7 +541,7 @@ export function LayoutCanvas({
                 <PanelRight className="h-3.5 w-3.5" />
                 Inspector
               </span>
-              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setShowInspector(false)} title="Hide inspector">
+              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setShowInspector(false)} title="Minimize inspector">
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
@@ -599,6 +599,16 @@ export function LayoutCanvas({
               )}
             </CardContent>
           </aside>
+        ) : (
+          <Button
+            variant="outline"
+            size="icon"
+            className="fixed bottom-4 right-4 z-40 h-10 w-10 rounded-full shadow-md md:relative md:bottom-auto md:right-auto md:z-auto md:h-8 md:w-8 md:rounded-none md:shadow-none md:border-l md:border-t-0 md:border-b md:border-r border-zinc-200 bg-white dark:bg-zinc-950 dark:border-zinc-800"
+            onClick={() => setShowInspector(true)}
+            title="Show inspector"
+          >
+            <PanelRightOpen className="h-4 w-4" />
+          </Button>
         )}
       </div>
     </div>

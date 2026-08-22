@@ -2,7 +2,7 @@
 
 import { useMap } from '@/context/MapContext';
 import { POI } from '@/types';
-import { Search, Upload, Download, Plus, GripVertical, Trash2, X, MapPin, Utensils, Landmark, Building2, TreePine, Hotel } from 'lucide-react';
+import { Search, Upload, Download, Plus, GripVertical, Trash2, X, MapPin, Utensils, Landmark, Building2, TreePine, Hotel, PanelLeftOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -152,7 +152,7 @@ function parsePaste(text: string): ParsedPOI[] {
   }
 }
 
-export function Sidebar({ onClose }: { onClose?: () => void }) {
+export function Sidebar({ onClose, onMinimize }: { onClose?: () => void; onMinimize?: () => void }) {
   const { pois, updatePoi, togglePoiActive, setPois, addPoi, removePoi, editingPoiId, setEditingPoiId } = useMap();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterRegion, setFilterRegion] = useState<string>('all');
@@ -299,11 +299,18 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
           <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">PinDrop</h2>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">{pois.filter(p => p.active).length} / {pois.length} active</p>
         </div>
-        {onClose && (
-          <Button variant="ghost" size="icon" className="h-8 w-8 md:hidden" onClick={onClose}>
-            <X className="h-4 w-4" />
-          </Button>
-        )}
+        <div className="flex items-center gap-1">
+          {onMinimize && (
+            <Button variant="ghost" size="icon" className="h-8 w-8 hidden md:flex" onClick={onMinimize} title="Minimize sidebar">
+              <PanelLeftOpen className="h-4 w-4" />
+            </Button>
+          )}
+          {onClose && (
+            <Button variant="ghost" size="icon" className="h-8 w-8 md:hidden" onClick={onClose}>
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 space-y-2">
