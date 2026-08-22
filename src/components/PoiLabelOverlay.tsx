@@ -101,7 +101,8 @@ export function PoiLabelOverlay({ map, pois, style, scale = 1 }: PoiLabelOverlay
               fontFamily: 'system-ui, sans-serif',
               lineHeight: '1.2',
               whiteSpace: 'nowrap',
-              border: '1px solid rgba(255,0,0,0.3)',
+              border: '2px solid red',
+              boxSizing: 'border-box',
             }}
           >
             {p.name}
