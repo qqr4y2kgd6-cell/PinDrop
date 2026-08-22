@@ -26,8 +26,14 @@ export function PoiLabelOverlay({ map, pois, style, scale = 1 }: PoiLabelOverlay
   const [positions, setPositions] = useState<Array<{ id: string; name: string; x: number; y: number }>>([]);
 
   useEffect(() => {
-    console.log('[PoiLabelOverlay] render style:', style);
-  }, [style]);
+    console.log('[PoiLabelOverlay] style changed:', style);
+    console.log('[PoiLabelOverlay] computed:', {
+      fontSizePx: style.fontSize * MM_TO_PX * scale,
+      paddingYPx: style.padding * MM_TO_PX * scale,
+      paddingXPx: style.padding * 1.5 * MM_TO_PX * scale,
+      borderRadiusPx: style.borderRadius * MM_TO_PX * scale,
+    });
+  }, [style, scale]);
 
   useEffect(() => {
     if (!map) return;
@@ -76,7 +82,7 @@ export function PoiLabelOverlay({ map, pois, style, scale = 1 }: PoiLabelOverlay
     <div className="pointer-events-none absolute inset-0 overflow-hidden">
       {positions.map((p) => (
         <div
-          key={p.id}
+          key={`${p.id}-${style.padding}-${style.fontSize}-${style.borderRadius}`}
           className="pointer-events-auto absolute whitespace-nowrap"
           style={{
             left: p.x,
@@ -99,6 +105,9 @@ export function PoiLabelOverlay({ map, pois, style, scale = 1 }: PoiLabelOverlay
             }}
           >
             {p.name}
+            <span style={{ fontSize: '9px', opacity: 0.6, marginLeft: 4 }}>
+              pad={style.padding.toFixed(1)} font={style.fontSize.toFixed(1)} rad={style.borderRadius.toFixed(1)}
+            </span>
           </div>
           <div
             style={{
