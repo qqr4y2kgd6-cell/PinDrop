@@ -70,13 +70,13 @@ export function PoiLabelOverlay({ map, pois, style, scale = 1 }: PoiLabelOverlay
 
   if (!map || positions.length === 0) return null;
 
-  console.log('[PoiLabelOverlay] render style:', style, 'positions:', positions.length, 'computed:', { fontSizePx, paddingYPx, paddingXPx, borderRadiusPx, arrowSize });
-
   const fontSizePx = style.fontSize * MM_TO_PX * scale;
   const paddingYPx = style.padding * MM_TO_PX * scale;
   const paddingXPx = style.padding * 1.5 * MM_TO_PX * scale;
   const borderRadiusPx = style.borderRadius * MM_TO_PX * scale;
   const arrowSize = Math.max(3, 5 * scale);
+
+  console.log('[PoiLabelOverlay] render style:', style, 'positions:', positions.length, 'computed:', { fontSizePx, paddingYPx, paddingXPx, borderRadiusPx, arrowSize });
 
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden">
