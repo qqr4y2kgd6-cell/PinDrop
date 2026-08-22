@@ -785,7 +785,6 @@ function PageCanvas({
   });
 
   const sig = JSON.stringify({
-    conv: [pageSize.w, pageSize.h, margins],
     vps: page.viewports.map((v) => [v.id, v.positionOnPage, v.rotation]),
     indexes: page.indexLists.map((c) => [c.id, c.position, c.rotation]),
     tbs: page.titleBlocks.map((c) => [c.id, c.position, c.rotation]),
