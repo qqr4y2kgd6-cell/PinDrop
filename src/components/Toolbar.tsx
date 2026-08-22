@@ -4,7 +4,7 @@ import { useMap } from '@/context/MapContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { ColorPicker } from './ColorPicker';
@@ -86,12 +86,10 @@ export function Toolbar() {
             </SelectContent>
           </Select>
           <Dialog open={pageSettingsOpen} onOpenChange={setPageSettingsOpen}>
-            <DialogTrigger>
-              <Button variant="outline" size="sm" className="h-8 text-xs">
-                <Settings className="h-3.5 w-3.5 mr-1" />
-                Page settings
-              </Button>
-            </DialogTrigger>
+            <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setPageSettingsOpen(true)}>
+              <Settings className="h-3.5 w-3.5 mr-1" />
+              Page settings
+            </Button>
             <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Page settings</DialogTitle>
